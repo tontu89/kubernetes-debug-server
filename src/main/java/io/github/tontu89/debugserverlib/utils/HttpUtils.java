@@ -1,9 +1,8 @@
-package com.kubernetes.debugserver.utils;
+package io.github.tontu89.debugserverlib.utils;
 
 import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
-import org.apache.commons.lang3.tuple.Pair;
 
 import javax.servlet.http.HttpServletRequest;
 import java.io.BufferedReader;
@@ -15,6 +14,7 @@ import java.net.HttpURLConnection;
 import java.net.Proxy;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
+import java.util.Base64;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -44,16 +44,16 @@ public class HttpUtils {
             } else {
                 stringBuilder.append("");
             }
-        } catch (IOException ex) {
-            log.error(ex.getMessage(), ex);
-            throw ex;
+        } catch (IOException e) {
+            log.error(Constants.LOG_ERROR_PREFIX, e);
+            throw e;
         } finally {
             if (bufferedReader != null) {
                 try {
                     bufferedReader.close();
-                } catch (IOException ex) {
-                    log.error(ex.getMessage(), ex);
-                    throw ex;
+                } catch (IOException e) {
+                    log.error(Constants.LOG_ERROR_PREFIX, e);
+                    throw e;
                 }
             }
         }
@@ -72,7 +72,7 @@ public class HttpUtils {
             connection.setRequestMethod(httpMethod);
             headers.forEach((name, value) -> connection.setRequestProperty(name, value));
 
-            if (payload != null) {
+            if (payload != null && payload.length() > 0) {
                 connection.setDoOutput(true);
                 DataOutputStream writer = new DataOutputStream(connection.getOutputStream());
                 writer.write(payload.getBytes(StandardCharsets.UTF_8));
@@ -81,10 +81,10 @@ public class HttpUtils {
             }
 
             BufferedReader br = null;
-            if (100 <= connection.getResponseCode() && connection.getResponseCode() <= 399) {
-                br = new BufferedReader(new InputStreamReader(prepareInputStream(connection.getContentEncoding(), connection.getInputStream()), "UTF-8"));
+            if (connection.getErrorStream() != null) {
+                br = new BufferedReader(new InputStreamReader(connection.getErrorStream(), "UTF-8"));
             } else {
-                br = new BufferedReader(new InputStreamReader(prepareInputStream(connection.getContentEncoding(), connection.getErrorStream()), "UTF-8"));
+                br = new BufferedReader(new InputStreamReader(prepareInputStream(connection.getContentEncoding(), connection.getInputStream()), "UTF-8"));
             }
 
             String responseString = null;
@@ -106,7 +106,7 @@ public class HttpUtils {
             }
             return responseString;
         } catch (Exception e) {
-            log.info(e.getMessage(), e);
+            log.info("DebugLib: exception" + e.getMessage(), e);
 
             HttpURLConnection httpURLConnection = new HttpURLConnection(new URL(host + uri)) {
                 @Override
@@ -170,5 +170,19 @@ public class HttpUtils {
         } else {
             return inputStream;
         }
+    }
+
+    @SneakyThrows
+    public static Map decodeJwtPayload(String jwtString) {
+        String[] jwtParts = jwtString.split("\\.");
+
+        if (jwtParts.length >= 2) {
+            String payload = jwtParts[1];
+
+            byte[] payloadInBytes = Base64.getDecoder().decode(payload);
+
+            return Constants.OBJECT_MAPPER.readValue(payloadInBytes, HashMap.class);
+        }
+        return null;
     }
 }

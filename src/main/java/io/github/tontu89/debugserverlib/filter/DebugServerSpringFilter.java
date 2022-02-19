@@ -1,13 +1,14 @@
-package com.kubernetes.debugserver.filter;
+package io.github.tontu89.debugserverlib.filter;
 
-import com.kubernetes.debugserver.ClientHandler;
-import com.kubernetes.debugserver.filter.requestwrapper.CachedBodyHttpServletRequest;
-import com.kubernetes.debugserver.model.HttpResponseInfo;
+import io.github.tontu89.debugserverlib.ClientHandler;
+import io.github.tontu89.debugserverlib.filter.requestwrapper.CachedBodyHttpServletRequest;
+import io.github.tontu89.debugserverlib.model.HttpResponseInfo;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
 import javax.servlet.Filter;
 import javax.servlet.FilterChain;
+import javax.servlet.FilterConfig;
 import javax.servlet.ServletException;
 import javax.servlet.ServletRequest;
 import javax.servlet.ServletResponse;
@@ -15,15 +16,16 @@ import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
-import java.util.ArrayList;
-import java.util.List;
+import java.util.concurrent.CopyOnWriteArrayList;
+
+import static io.github.tontu89.debugserverlib.utils.Constants.LOG_ERROR_PREFIX;
 
 
 @Component
 @Slf4j
-public class DebugSpringFilter implements Filter {
+public class DebugServerSpringFilter implements Filter {
 
-    private final List<ClientHandler> debugClientHandlers = new ArrayList<>();
+    private final CopyOnWriteArrayList<ClientHandler> debugClientHandlers = new CopyOnWriteArrayList<>();
 
     @Override
     public void doFilter(ServletRequest servletRequest, ServletResponse servletResponse, FilterChain filterChain) throws IOException, ServletException {
@@ -31,6 +33,8 @@ public class DebugSpringFilter implements Filter {
 
         CachedBodyHttpServletRequest cachedBodyHttpServletRequest = new CachedBodyHttpServletRequest((HttpServletRequest) servletRequest);
         HttpServletResponse res = (HttpServletResponse) servletResponse;
+
+        log.info("DebugLib: Check matching request for {}", cachedBodyHttpServletRequest.getRequestURI());
 
         try {
             for (int i = 0 ; i < this.debugClientHandlers.size(); ++i) {
@@ -40,6 +44,7 @@ public class DebugSpringFilter implements Filter {
                     this.debugClientHandlers.remove(i);
                     i--;
                 } else if (debugClientHandler.isMatch(cachedBodyHttpServletRequest)) {
+                    log.info("DebugLib: URL {} matched.", cachedBodyHttpServletRequest.getRequestURI());
                     matched = true;
                     HttpResponseInfo clientResponse = debugClientHandler.forwardRequestToClient(cachedBodyHttpServletRequest);
 
@@ -61,8 +66,8 @@ public class DebugSpringFilter implements Filter {
                     break;
                 }
             }
-        } catch (Exception ex) {
-            log.error(ex.getMessage(), ex);
+        } catch (Exception e) {
+            log.error(LOG_ERROR_PREFIX, e);
         }
 
         if (!matched) {
@@ -72,5 +77,15 @@ public class DebugSpringFilter implements Filter {
 
     public void addDebugClient(ClientHandler debugClientHandler) {
         this.debugClientHandlers.add(debugClientHandler);
+    }
+
+    @Override
+    public void init(FilterConfig filterConfig) {
+
+    }
+
+    @Override
+    public void destroy() {
+
     }
 }

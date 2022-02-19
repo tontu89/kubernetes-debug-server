@@ -1,9 +1,8 @@
-package com.kubernetes.debugserver.filter;
+package io.github.tontu89.debugserverlib.filter;
 
 import lombok.Getter;
 import lombok.ToString;
 
-import javax.servlet.http.HttpServletRequest;
 import java.util.ArrayList;
 import java.util.List;
 

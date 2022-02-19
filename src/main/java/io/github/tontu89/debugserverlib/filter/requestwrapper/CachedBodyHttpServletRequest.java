@@ -1,4 +1,4 @@
-package com.kubernetes.debugserver.filter.requestwrapper;
+package io.github.tontu89.debugserverlib.filter.requestwrapper;
 
 import org.springframework.util.StreamUtils;
 

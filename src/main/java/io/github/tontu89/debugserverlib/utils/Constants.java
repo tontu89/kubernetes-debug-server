@@ -1,4 +1,4 @@
-package com.kubernetes.debugserver.utils;
+package io.github.tontu89.debugserverlib.utils;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 
@@ -6,6 +6,6 @@ public class Constants {
     public static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
     public static final int POLL_QUEUE_TIMEOUT_MS = 200;
     public static final int MESSAGE_CHUNK_SIZE_IN_BYTE = 10;
-    public static final char START_MESSAGE_INDICATOR = 2;
-    public static final char END_MESSAGE_INDICATOR = 3;
+    public static final int MAX_REQUEST_TIME_OUT_MS = 10 * 60 * 1000;
+    public static final String LOG_ERROR_PREFIX = "DebugLib: exception";
 }

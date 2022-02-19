@@ -1,4 +1,4 @@
-package com.kubernetes.debugserver.model;
+package io.github.tontu89.debugserverlib.model;
 
 import lombok.AllArgsConstructor;
 import lombok.Builder;

@@ -1,4 +1,4 @@
-package com.kubernetes.debugserver.model;
+package io.github.tontu89.debugserverlib.model;
 
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -7,7 +7,7 @@ import lombok.NoArgsConstructor;
 import lombok.SneakyThrows;
 import lombok.ToString;
 
-import static com.kubernetes.debugserver.utils.Constants.OBJECT_MAPPER;
+import static io.github.tontu89.debugserverlib.utils.Constants.OBJECT_MAPPER;
 
 @Data
 @ToString

@@ -1,4 +1,4 @@
-package com.kubernetes.debugserver.filter;
+package io.github.tontu89.debugserverlib.filter;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.jayway.jsonpath.JsonPath;
@@ -39,16 +39,19 @@ public class FilterRequestMatchPattern {
         this.jsonPathObject = JsonPath.compile(this.jsonPath);
         this.matchPatternObject = Pattern.compile(this.matchPattern);
     }
+
     @SneakyThrows
     public boolean isMatch(String httpRequestJsonFormat) {
         String data = this.getJsonPathData(httpRequestJsonFormat);
-        Matcher matcher = this.matchPatternObject.matcher(data);
-        return matcher.matches();
+        if (data != null) {
+            Matcher matcher = this.matchPatternObject.matcher(data);
+            return matcher.matches();
+        } else {
+            return false;
+        }
     }
 
     private String getJsonPathData(String json) {
-        return JsonPath.parse(json).<String>read(this.jsonPathObject);
+        return JsonPath.parse(json).read(this.jsonPathObject, String.class);
     }
-
-
 }

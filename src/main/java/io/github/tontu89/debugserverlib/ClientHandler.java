@@ -1,15 +1,15 @@
-package com.kubernetes.debugserver;
+package io.github.tontu89.debugserverlib;
 
 import com.fasterxml.jackson.core.type.TypeReference;
-import com.kubernetes.debugserver.filter.FilterRequest;
-import com.kubernetes.debugserver.filter.FilterRequestMatchPattern;
-import com.kubernetes.debugserver.model.HttpResponseInfo;
-import com.kubernetes.debugserver.model.MessageRequest;
-import com.kubernetes.debugserver.model.MessageResponse;
-import com.kubernetes.debugserver.model.ServerClientMessage;
-import com.kubernetes.debugserver.model.HttpRequestInfo;
-import com.kubernetes.debugserver.utils.DebugUtils;
-import com.kubernetes.debugserver.utils.HttpUtils;
+import io.github.tontu89.debugserverlib.filter.FilterRequest;
+import io.github.tontu89.debugserverlib.filter.FilterRequestMatchPattern;
+import io.github.tontu89.debugserverlib.model.HttpRequestInfo;
+import io.github.tontu89.debugserverlib.model.HttpResponseInfo;
+import io.github.tontu89.debugserverlib.model.MessageRequest;
+import io.github.tontu89.debugserverlib.model.MessageResponse;
+import io.github.tontu89.debugserverlib.model.ServerClientMessage;
+import io.github.tontu89.debugserverlib.utils.DebugUtils;
+import io.github.tontu89.debugserverlib.utils.HttpUtils;
 import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
@@ -22,8 +22,6 @@ import java.io.IOException;
 import java.net.HttpURLConnection;
 import java.net.Socket;
 import java.net.SocketException;
-import java.nio.charset.Charset;
-import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
@@ -38,9 +36,10 @@ import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 
-import static com.kubernetes.debugserver.utils.Constants.MESSAGE_CHUNK_SIZE_IN_BYTE;
-import static com.kubernetes.debugserver.utils.Constants.OBJECT_MAPPER;
-import static com.kubernetes.debugserver.utils.Constants.POLL_QUEUE_TIMEOUT_MS;
+import static io.github.tontu89.debugserverlib.utils.Constants.LOG_ERROR_PREFIX;
+import static io.github.tontu89.debugserverlib.utils.Constants.MAX_REQUEST_TIME_OUT_MS;
+import static io.github.tontu89.debugserverlib.utils.Constants.OBJECT_MAPPER;
+import static io.github.tontu89.debugserverlib.utils.Constants.POLL_QUEUE_TIMEOUT_MS;
 
 @Slf4j
 public class ClientHandler extends Thread implements AutoCloseable {
@@ -86,9 +85,6 @@ public class ClientHandler extends Thread implements AutoCloseable {
         ServerClientMessage receivedMessage;
 
         try {
-            boolean reading = false;
-
-
             startSendMessageToClient();
             startProcessClientRequest();
             startProcessClientResponse();
@@ -104,19 +100,19 @@ public class ClientHandler extends Thread implements AutoCloseable {
                     } else if (receivedMessage.getType() == ServerClientMessage.Type.RESPONSE) {
                         this.messageResponseFromClientQueue.add(receivedMessage);
                     } else {
-                        log.error("Unsupported message type {}", receivedMessage);
+                        log.error("DebugLib: Unsupported message type {}", receivedMessage);
                     }
                 } catch (EOFException e) {
-                    break;
+                    this.stop = true;
                 } catch (SocketException e) {
-                    log.error(e.getMessage(), e);
-                    break;
+                    this.stop = true;
+                    log.error(LOG_ERROR_PREFIX, e);
                 } catch (IOException e) {
-                    log.error(e.getMessage(), e);
+                    log.error(LOG_ERROR_PREFIX, e);
                 }
             }
         } catch (Exception e) {
-            log.error(e.getMessage(), e);
+            log.error(LOG_ERROR_PREFIX, e);
         }
 
         this.close();
@@ -124,7 +120,7 @@ public class ClientHandler extends Thread implements AutoCloseable {
 
     @SneakyThrows
     public HttpResponseInfo forwardRequestToClient(HttpServletRequest httpRequest) {
-        HttpRequestInfo requestInfo = HttpRequestInfo.fromHttpRequest(httpRequest, true);
+        HttpRequestInfo requestInfo = HttpRequestInfo.fromHttpRequest(httpRequest, true, false);
         MessageRequest messageRequest = MessageRequest.builder()
                 .command(MessageRequest.Command.CLIENT_EXECUTE_HTTP_REQUEST)
                 .data(OBJECT_MAPPER.writeValueAsString(requestInfo))
@@ -139,19 +135,26 @@ public class ClientHandler extends Thread implements AutoCloseable {
 
         synchronized (messageId) {
             try {
-                log.info("Server request {}: Wait response", messageId);
-                messageId.wait();
-            } catch (InterruptedException ignored) {}
-
-            log.info("Server request {}: Received response", messageId);
-            ServerClientMessage message = this.responseForServerRequest.get(messageId);
-            log.info("Server request {}: Received response with: {}", messageId, message);
-
-            if (!messageId.equals(message.getId())) {
-                throw new Exception("Unexpected error");
+                log.info("DebugLib: Server request {}: Wait response", messageId);
+                messageId.wait(MAX_REQUEST_TIME_OUT_MS);
+            } catch (InterruptedException ignored) {
+                Thread.currentThread().interrupt();
             }
 
-            return DebugUtils.escapedJsonStringToObject(message.getResponse().getData(), HttpResponseInfo.class);
+            if (!this.responseForServerRequest.containsKey(messageId)) {
+                log.error("DebugLib: Server request {}: timeout after {} minutes", messageId, MAX_REQUEST_TIME_OUT_MS / 1000 / 60);
+                return HttpResponseInfo.builder().httpStatus(504).build();
+            } else {
+                log.info("DebugLib: Server request {}: Received response", messageId);
+                ServerClientMessage message = this.responseForServerRequest.get(messageId);
+                log.info("DebugLib: Server request {}: Received response with: {}", messageId, message);
+
+                if (!messageId.equals(message.getId())) {
+                    throw new Exception("Unexpected error");
+                }
+
+                return DebugUtils.escapedJsonStringToObject(message.getResponse().getData(), HttpResponseInfo.class);
+            }
         }
     }
 
@@ -166,7 +169,7 @@ public class ClientHandler extends Thread implements AutoCloseable {
                     DebugUtils.writeMessage(this.dos, message);
                 }
             } catch (Exception e) {
-                log.error(e.getMessage(), e);
+                log.error(LOG_ERROR_PREFIX, e);
                 this.closeAsync();
             }
         }, this.executor);
@@ -213,7 +216,7 @@ public class ClientHandler extends Thread implements AutoCloseable {
 
                     }
                 } catch (Exception e) {
-                    log.error(e.getMessage(), e);
+                    log.error(LOG_ERROR_PREFIX, e);
                     messageResponse.setStatus(HttpStatus.INTERNAL_SERVER_ERROR.value());
                 }
                 ServerClientMessage serverClientMessage = ServerClientMessage.builder()
@@ -246,7 +249,7 @@ public class ClientHandler extends Thread implements AutoCloseable {
                     }
                 }
             } catch (Exception e) {
-                log.error(e.getMessage(), e);
+                log.error(LOG_ERROR_PREFIX, e);
                 this.closeAsync();
             }
         }, this.executor);
@@ -255,11 +258,11 @@ public class ClientHandler extends Thread implements AutoCloseable {
     public boolean isMatch(HttpServletRequest httpRequest) {
         if (this.isRunning()) {
             try {
-                String httpRequestJsonFormat = OBJECT_MAPPER.writeValueAsString(HttpRequestInfo.fromHttpRequest(httpRequest, true));
+                String httpRequestJsonFormat = OBJECT_MAPPER.writeValueAsString(HttpRequestInfo.fromHttpRequest(httpRequest, true, true));
 
                 return this.debugFilterRequest.isMatch(httpRequestJsonFormat);
             } catch (Exception e) {
-                log.error(e.getMessage(), e);
+                log.error(LOG_ERROR_PREFIX, e);
             }
         }
         return false;
@@ -271,28 +274,30 @@ public class ClientHandler extends Thread implements AutoCloseable {
         this.stop = true;
         this.status = Status.STOPPED;
 
-        System.out.println("Client " + this.socket + " sends exit...");
-        System.out.println("Closing this connection.");
-        System.out.println("Connection closed");
+        log.info("Client " + this.socket + " sends exit...");
+        log.info("Closing this connection.");
+        log.info("Connection closed");
 
         Arrays.asList(this.processClientRequestFuture, this.sendMessageToClientFuture, this.processClientResponseFuture).forEach((f) -> {
             try {
                 if (!f.isDone()) {
                     f.get();
                 }
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
             } catch (Exception e) {
-                log.error(e.getMessage(), e);
+                log.error(LOG_ERROR_PREFIX, e);
             }
         });
 
-        this.serverRequestId.forEach((k, v) -> {
+        this.serverRequestId.forEach((key, value) -> {
             try {
-                synchronized (v) {
-                    v.notifyAll();
+                synchronized (value) {
+                    value.notifyAll();
                 }
             } catch (Exception e) {
-                log.error("Error happen with ({}, {}) when notify object for closing", k, v);
-                log.error(e.getMessage(), e);
+                log.error("DebugLib: Error happen with ({}, {}) when notify object for closing", key, value);
+                log.error(LOG_ERROR_PREFIX, e);
             }
         });
         // closing resources
@@ -300,7 +305,7 @@ public class ClientHandler extends Thread implements AutoCloseable {
             try {
                 this.dis.close();
             } catch (IOException e) {
-                log.error(e.getMessage(), e);
+                log.error(LOG_ERROR_PREFIX, e);
             }
         }
 
@@ -308,7 +313,7 @@ public class ClientHandler extends Thread implements AutoCloseable {
             try {
                 this.dos.close();
             } catch (IOException e) {
-                log.error(e.getMessage(), e);
+                log.error(LOG_ERROR_PREFIX, e);
             }
         }
 
@@ -316,7 +321,7 @@ public class ClientHandler extends Thread implements AutoCloseable {
             try {
                 this.socket.close();
             } catch (IOException e) {
-                log.error(e.getMessage(), e);
+                log.error(LOG_ERROR_PREFIX, e);
             }
         }
     }
@@ -333,6 +338,7 @@ public class ClientHandler extends Thread implements AutoCloseable {
         try {
             return queue.poll(POLL_QUEUE_TIMEOUT_MS, TimeUnit.MILLISECONDS);
         } catch (InterruptedException ignored) {
+            Thread.currentThread().interrupt();
         }
         return null;
     }
@@ -362,5 +368,7 @@ public class ClientHandler extends Thread implements AutoCloseable {
     private void closeAsync() {
         CompletableFuture.runAsync(() -> this.close(), this.executor);
     }
+
+
 
 }

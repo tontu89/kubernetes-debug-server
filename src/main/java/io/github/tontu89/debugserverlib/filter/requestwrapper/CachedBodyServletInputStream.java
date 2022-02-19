@@ -1,5 +1,6 @@
-package com.kubernetes.debugserver.filter.requestwrapper;
+package io.github.tontu89.debugserverlib.filter.requestwrapper;
 
+import io.github.tontu89.debugserverlib.utils.Constants;
 import lombok.extern.slf4j.Slf4j;
 
 import javax.servlet.ReadListener;
@@ -22,7 +23,7 @@ public class CachedBodyServletInputStream extends ServletInputStream {
         try {
             return cachedBodyInputStream.available() == 0;
         } catch (IOException e) {
-            log.error(e.getMessage(), e);
+            log.error(Constants.LOG_ERROR_PREFIX, e);
         }
         return false;
     }
