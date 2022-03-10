@@ -4,6 +4,9 @@ import io.github.tontu89.debugserverlib.config.DebugServerConfig;
 import io.github.tontu89.debugserverlib.filter.DebugServerSpringFilter;
 import io.github.tontu89.debugserverlib.utils.HttpsTrustManager;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.annotation.Profile;
+import org.springframework.core.env.Environment;
+import org.springframework.core.env.Profiles;
 import org.springframework.stereotype.Component;
 
 import java.io.DataInputStream;
@@ -11,10 +14,13 @@ import java.io.DataOutputStream;
 import java.io.IOException;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.util.Arrays;
+import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 
 import static io.github.tontu89.debugserverlib.utils.Constants.LOG_ERROR_PREFIX;
 
+@Profile("RemoteDebug")
 @Component
 @Slf4j
 public class Server implements AutoCloseable {
@@ -24,11 +30,14 @@ public class Server implements AutoCloseable {
     private DebugServerSpringFilter debugServerSpringFilter;
     private ServerSocket server = null;
 
-    public Server(DebugServerSpringFilter debugServerSpringFilter, DebugServerConfig debugServerConfig) {
+    public Server(DebugServerSpringFilter debugServerSpringFilter, DebugServerConfig debugServerConfig, Environment env) {
         this.debugServerSpringFilter = debugServerSpringFilter;
         this.debugServerConfig = debugServerConfig;
-        log.info("DebugLib: Prepare to load debug server");
-        CompletableFuture.runAsync(() -> this.start());
+
+        if (this.isEnableRemoteDebug(env)) {
+            log.info("DebugLib: Prepare to load debug server");
+            CompletableFuture.runAsync(() -> this.start());
+        }
     }
 
     private void start() {
@@ -114,5 +123,15 @@ public class Server implements AutoCloseable {
             return false;
         }
         return true;
+    }
+
+    private boolean isEnableRemoteDebug(Environment env) {
+        if (env != null) {
+            String[] activeProfiles = env.getActiveProfiles();
+            return Optional.ofNullable(activeProfiles).map(a -> Arrays.stream(a).filter(p -> "RemoteDebug".equalsIgnoreCase(p)).count()).orElse(0L) > 0;
+        } else {
+            log.info("DebugLib: Environment null pointer");
+            return false;
+        }
     }
 }

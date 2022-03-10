@@ -1,4 +1,4 @@
-package io.github.tontu89.debugserverlib.filter;
+package io.github.tontu89.debugserverlib.model;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.jayway.jsonpath.JsonPath;

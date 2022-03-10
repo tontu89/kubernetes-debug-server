@@ -1,8 +1,8 @@
 package io.github.tontu89.debugserverlib;
 
 import com.fasterxml.jackson.core.type.TypeReference;
-import io.github.tontu89.debugserverlib.filter.FilterRequest;
-import io.github.tontu89.debugserverlib.filter.FilterRequestMatchPattern;
+import io.github.tontu89.debugserverlib.model.FilterRequest;
+import io.github.tontu89.debugserverlib.model.FilterRequestMatchPattern;
 import io.github.tontu89.debugserverlib.model.HttpRequestInfo;
 import io.github.tontu89.debugserverlib.model.HttpResponseInfo;
 import io.github.tontu89.debugserverlib.model.MessageRequest;

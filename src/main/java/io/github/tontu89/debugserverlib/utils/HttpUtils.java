@@ -3,6 +3,7 @@ package io.github.tontu89.debugserverlib.utils;
 import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
+import org.springframework.http.HttpStatus;
 
 import javax.servlet.http.HttpServletRequest;
 import java.io.BufferedReader;
@@ -18,12 +19,17 @@ import java.util.Base64;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Consumer;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import java.util.zip.GZIPInputStream;
 
 
 @Slf4j
 public class HttpUtils {
+
+    private static Pattern HTTP_URL_CONNECTION_EXCEPTION = Pattern.compile("Server returned HTTP response code: (\\d+).*");
 
     @SneakyThrows
     public static String getBody(HttpServletRequest request) {
@@ -108,6 +114,16 @@ public class HttpUtils {
         } catch (Exception e) {
             log.info("DebugLib: exception" + e.getMessage(), e);
 
+            AtomicInteger httpStatus = new AtomicInteger(500);
+
+            if (e instanceof IOException) {
+                Matcher matcher = HTTP_URL_CONNECTION_EXCEPTION.matcher(e.getMessage());
+
+                if (matcher.matches()) {
+                    httpStatus.set(Integer.parseInt(matcher.group(1)));
+                }
+            }
+
             HttpURLConnection httpURLConnection = new HttpURLConnection(new URL(host + uri)) {
                 @Override
                 public void connect() throws IOException {
@@ -131,12 +147,12 @@ public class HttpUtils {
 
                 @Override
                 public int getResponseCode() throws IOException {
-                    return 500;
+                    return httpStatus.get();
                 }
 
                 @Override
                 public String getResponseMessage() throws IOException {
-                    return "Connection refused";
+                    return HttpStatus.resolve(httpStatus.get()).getReasonPhrase();
                 }
 
                 @Override
@@ -147,7 +163,8 @@ public class HttpUtils {
 
             action.accept(httpURLConnection);
 
-            return "Connection refused to " + host + uri;
+            log.info("DebugLib: Connection refused to {}{}", host, uri);
+            return null;
         }
     }
 

@@ -4,6 +4,7 @@ import io.github.tontu89.debugserverlib.ClientHandler;
 import io.github.tontu89.debugserverlib.filter.requestwrapper.CachedBodyHttpServletRequest;
 import io.github.tontu89.debugserverlib.model.HttpResponseInfo;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Component;
 
 import javax.servlet.Filter;
@@ -21,6 +22,7 @@ import java.util.concurrent.CopyOnWriteArrayList;
 import static io.github.tontu89.debugserverlib.utils.Constants.LOG_ERROR_PREFIX;
 
 
+@Profile("RemoteDebug")
 @Component
 @Slf4j
 public class DebugServerSpringFilter implements Filter {
