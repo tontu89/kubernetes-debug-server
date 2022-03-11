@@ -3,12 +3,13 @@ package io.github.tontu89.debugserverlib.model;
 import lombok.Getter;
 import lombok.ToString;
 
+import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.List;
 
 @Getter
 @ToString
-public class FilterRequest {
+public class FilterRequest implements Serializable {
     private List<FilterRequestMatchPattern> matchPatterns;
 
     public FilterRequest() {

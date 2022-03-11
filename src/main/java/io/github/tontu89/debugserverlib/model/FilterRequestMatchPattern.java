@@ -10,6 +10,7 @@ import lombok.SneakyThrows;
 import lombok.ToString;
 import lombok.extern.slf4j.Slf4j;
 
+import java.io.Serializable;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -19,7 +20,7 @@ import java.util.regex.Pattern;
 @NoArgsConstructor
 @AllArgsConstructor
 @Slf4j
-public class FilterRequestMatchPattern {
+public class FilterRequestMatchPattern implements Serializable {
     private String jsonPath;
 
     private String matchPattern;

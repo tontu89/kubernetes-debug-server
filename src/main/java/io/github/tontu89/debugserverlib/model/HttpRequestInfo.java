@@ -11,6 +11,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 
 import javax.servlet.http.HttpServletRequest;
+import java.io.Serializable;
 import java.util.Enumeration;
 import java.util.HashMap;
 import java.util.Locale;
@@ -24,7 +25,7 @@ import static io.github.tontu89.debugserverlib.utils.Constants.LOG_ERROR_PREFIX;
 @AllArgsConstructor
 @NoArgsConstructor
 @ToString
-public class HttpRequestInfo {
+public class HttpRequestInfo implements Serializable {
     private String uri;
     private String method;
     private Map<String, String> headers;
