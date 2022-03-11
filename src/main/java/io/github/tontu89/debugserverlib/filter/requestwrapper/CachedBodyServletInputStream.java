@@ -23,7 +23,7 @@ public class CachedBodyServletInputStream extends ServletInputStream {
         try {
             return cachedBodyInputStream.available() == 0;
         } catch (IOException e) {
-            log.error(Constants.LOG_ERROR_PREFIX, e);
+            log.error(Constants.LOG_ERROR_PREFIX + e.getMessage(), e);
         }
         return false;
     }

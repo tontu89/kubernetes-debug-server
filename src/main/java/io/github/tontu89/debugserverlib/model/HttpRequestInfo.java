@@ -49,7 +49,7 @@ public class HttpRequestInfo {
                     }
                 } catch (JWTDecodeException e){
                     log.error("DebugLib: failed to parse authorization jwt token [{}]", headerValue);
-                    log.error(LOG_ERROR_PREFIX, e);
+                    log.error(LOG_ERROR_PREFIX + e.getMessage(), e);
                 }
             }
         }

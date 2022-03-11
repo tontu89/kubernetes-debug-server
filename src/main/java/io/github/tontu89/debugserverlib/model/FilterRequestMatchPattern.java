@@ -8,6 +8,7 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.SneakyThrows;
 import lombok.ToString;
+import lombok.extern.slf4j.Slf4j;
 
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -17,6 +18,7 @@ import java.util.regex.Pattern;
 @ToString
 @NoArgsConstructor
 @AllArgsConstructor
+@Slf4j
 public class FilterRequestMatchPattern {
     private String jsonPath;
 
@@ -43,12 +45,15 @@ public class FilterRequestMatchPattern {
     @SneakyThrows
     public boolean isMatch(String httpRequestJsonFormat) {
         String data = this.getJsonPathData(httpRequestJsonFormat);
+        boolean matchResult = false;
         if (data != null) {
             Matcher matcher = this.matchPatternObject.matcher(data);
-            return matcher.matches();
-        } else {
-            return false;
+            matchResult = matcher.matches();
         }
+
+        log.debug("DebugLib: URI data [{}] with matchPattern [{}] with result {}", data, matchPattern, matchResult);
+
+        return matchResult;
     }
 
     private String getJsonPathData(String json) {

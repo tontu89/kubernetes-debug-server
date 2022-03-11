@@ -76,13 +76,13 @@ public class Server implements AutoCloseable {
 
                     this.debugServerSpringFilter.addDebugClient(t);
 
-                } catch (Exception e) {
+                } catch (Throwable e) {
                     closeSocket(socket);
-                    log.error(LOG_ERROR_PREFIX, e);
+                    log.error(LOG_ERROR_PREFIX + e.getMessage(), e);
                 }
             }
-        } catch (Exception e) {
-            log.error(LOG_ERROR_PREFIX, e);
+        } catch (Throwable e) {
+            log.error(LOG_ERROR_PREFIX + e.getMessage(), e);
         }
     }
 
@@ -94,7 +94,7 @@ public class Server implements AutoCloseable {
             try {
                 this.server.close();
             } catch (IOException e) {
-                log.error(LOG_ERROR_PREFIX, e);
+                log.error(LOG_ERROR_PREFIX + e.getMessage(), e);
             }
         }
     }
@@ -104,8 +104,8 @@ public class Server implements AutoCloseable {
             if (socket != null && !socket.isClosed()) {
                 socket.close();
             }
-        } catch (Exception e1) {
-            log.error(LOG_ERROR_PREFIX, e1);
+        } catch (Throwable e1) {
+            log.error(LOG_ERROR_PREFIX + e1.getMessage(), e1);
         }
     }
 
@@ -119,7 +119,7 @@ public class Server implements AutoCloseable {
             log.info("DebugLib: Started debug server on port {}", this.server.getLocalPort());
         } catch (IOException e) {
             log.error("DebugLib: Cannot start debug server on port {}", port);
-            log.error(LOG_ERROR_PREFIX, e);
+            log.error(LOG_ERROR_PREFIX + e.getMessage(), e);
             return false;
         }
         return true;
