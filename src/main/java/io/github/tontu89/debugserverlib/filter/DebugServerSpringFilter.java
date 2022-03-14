@@ -17,6 +17,7 @@ import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.Executor;
@@ -36,49 +37,57 @@ public class DebugServerSpringFilter implements Filter {
     public void doFilter(ServletRequest servletRequest, ServletResponse servletResponse, FilterChain filterChain) throws IOException, ServletException {
         boolean matched = false;
 
-        CachedBodyHttpServletRequest cachedBodyHttpServletRequest = new CachedBodyHttpServletRequest((HttpServletRequest) servletRequest);
-        HttpServletResponse res = (HttpServletResponse) servletResponse;
+        HttpServletRequest httpServletRequest = (HttpServletRequest)servletRequest;
 
-        log.info("DebugLib: Check matching request for {}", cachedBodyHttpServletRequest.getRequestURI());
+        String uri = httpServletRequest.getRequestURI();
 
-        try {
-            for (int i = 0 ; i < this.debugClientHandlers.size(); ++i) {
-                ClientHandler debugClientHandler = this.debugClientHandlers.get(i);
+        if (!uri.startsWith("/actuator")) {
+            CachedBodyHttpServletRequest cachedBodyHttpServletRequest = new CachedBodyHttpServletRequest(httpServletRequest);
+            HttpServletResponse res = (HttpServletResponse) servletResponse;
 
-                if (debugClientHandler.isRunning() && debugClientHandler.isMatch(cachedBodyHttpServletRequest)) {
-                    log.info("DebugLib: URL {} matched. Will be forwarding to client {}", cachedBodyHttpServletRequest.getRequestURI(), debugClientHandler.getClientId());
-                    matched = true;
-                    HttpResponseInfo clientResponse = debugClientHandler.forwardHttpRequestToClient(cachedBodyHttpServletRequest);
+            log.info("DebugLib: Check matching request for {}", uri);
 
-                    for(String header : clientResponse.getHeaders().keySet()) {
-                        // Content is plain text
-                        if ("Content-Encoding".equalsIgnoreCase(header) && "gzip".equalsIgnoreCase(clientResponse.getHeaders().get(header))) {
-                            continue;
-                        } else if ("transfer-encoding".equalsIgnoreCase(header)) {
-                            continue;
-                        } else {
-                            res.addHeader(header, clientResponse.getHeaders().get(header));
-                        }
+            try {
+                for (int i = 0; i < this.debugClientHandlers.size(); ++i) {
+                    ClientHandler debugClientHandler = this.debugClientHandlers.get(i);
+
+                    if (debugClientHandler.isRunning() && debugClientHandler.isMatch(cachedBodyHttpServletRequest)) {
+                        log.info("DebugLib: URL {} matched. Will be forwarding to client [{}][{}]", cachedBodyHttpServletRequest.getRequestURI(), debugClientHandler.getClientName(), debugClientHandler.getClientId());
+                        matched = true;
+                        HttpResponseInfo clientResponse = debugClientHandler.forwardHttpRequestToClient(cachedBodyHttpServletRequest);
+
+                        Optional.ofNullable(clientResponse.getHeaders()).ifPresent(headers -> headers.forEach((headerName, headerValue) -> {
+                            // Content is plain text
+                            if (!"Content-Encoding".equalsIgnoreCase(headerName) && "gzip".equalsIgnoreCase(headerValue)) {
+                                // Do nothing
+                            } else if ("transfer-encoding".equalsIgnoreCase(headerName)) {
+                                // Do nothing;
+                            } else {
+                                res.addHeader(headerName, clientResponse.getHeaders().get(headerValue));
+                            }
+                        }));
+
+                        res.setStatus(clientResponse.getHttpStatus());
+                        byte[] responseData = clientResponse.getPayload().getBytes(StandardCharsets.UTF_8);
+                        res.setContentLength(responseData.length);
+                        res.getOutputStream().write(responseData);
+                        break;
                     }
-
-                    res.setStatus(clientResponse.getHttpStatus());
-                    byte[] responseData = clientResponse.getPayload().getBytes(StandardCharsets.UTF_8);
-                    res.setContentLength(responseData.length);
-                    res.getOutputStream().write(responseData);
-                    break;
                 }
+            } catch (Throwable e) {
+                log.error(LOG_ERROR_PREFIX + e.getMessage(), e);
             }
-        } catch (Throwable e) {
-            log.error(LOG_ERROR_PREFIX + e.getMessage(), e);
-        }
 
-        if (!matched) {
-            filterChain.doFilter(cachedBodyHttpServletRequest, servletResponse);
+            if (!matched) {
+                filterChain.doFilter(cachedBodyHttpServletRequest, servletResponse);
+            }
+        } else {
+            filterChain.doFilter(servletRequest, servletResponse);
         }
     }
 
     public void addDebugClient(ClientHandler debugClientHandler) {
-        log.info("DebugLib: Add new client {}", debugClientHandler.getClientId());
+        log.info("DebugLib: Add new client [{}][{}]", debugClientHandler.getClientName(), debugClientHandler.getClientId());
         this.debugClientHandlers.add(debugClientHandler);
         CompletableFuture.runAsync(() -> {
             synchronized (debugClientHandler) {
@@ -88,7 +97,7 @@ public class DebugServerSpringFilter implements Filter {
                     Thread.currentThread().interrupt();
                 }
                 try {
-                    log.info("DebugLib: Remove client {} with status {}", debugClientHandler.getClientId(), debugClientHandler.getStatus());
+                    log.info("DebugLib: Remove client [{}][{}] with status {}", debugClientHandler.getClientName(), debugClientHandler.getClientId(), debugClientHandler.getStatus());
                     this.debugClientHandlers.remove(debugClientHandler);
                 } catch (Throwable e) {
                     log.error(LOG_ERROR_PREFIX + e.getMessage(), e);

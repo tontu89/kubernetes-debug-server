@@ -1,6 +1,8 @@
 package io.github.tontu89.debugserverlib;
 
 import com.fasterxml.jackson.core.type.TypeReference;
+import com.jayway.jsonpath.JsonPath;
+import io.github.tontu89.debugserverlib.config.DebugServerConfig;
 import io.github.tontu89.debugserverlib.model.FilterRequest;
 import io.github.tontu89.debugserverlib.model.FilterRequestMatchPattern;
 import io.github.tontu89.debugserverlib.model.HttpRequestInfo;
@@ -22,6 +24,7 @@ import java.io.EOFException;
 import java.io.IOException;
 import java.net.Socket;
 import java.net.SocketException;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
@@ -30,6 +33,7 @@ import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executor;
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.LinkedBlockingQueue;
@@ -50,7 +54,9 @@ public class ClientHandler extends Thread implements AutoCloseable {
     private final BlockingQueue<ServerClientMessage> messageToClientQueue;
     private final DataInputStream dis;
     private final DataOutputStream dos;
+    private final DebugServerConfig debugServerConfig;
     private final Executor executor;
+    private final ExecutorService processClientRequestExecutor;
     private final FilterRequest debugFilterRequest;
     private final Map<String, ServerClientMessage> responseForServerRequest;
     private final Map<String, String> serverRequestId;
@@ -59,14 +65,15 @@ public class ClientHandler extends Thread implements AutoCloseable {
 
     private boolean stop;
 
-    private Status status;
     private Future<Void> sendMessageToClientFuture;
     private Future<Void> processClientRequestFuture;
     private Future<Void> processClientResponseFuture;
     private Future<Void> heartBeatFuture;
+    private Status status;
+    private String clientName;
 
 
-    public ClientHandler(DataInputStream dis, DataOutputStream dos, Socket socket) {
+    public ClientHandler(DebugServerConfig debugServerConfig, DataInputStream dis, DataOutputStream dos, Socket socket) {
         this.socket = socket;
         this.dis = dis;
         this.dos = dos;
@@ -80,6 +87,8 @@ public class ClientHandler extends Thread implements AutoCloseable {
         this.serverRequestId = new ConcurrentHashMap<>();
         this.stop = false;
         this.clientId = UUID.randomUUID().toString();
+        this.debugServerConfig = debugServerConfig;
+        this.processClientRequestExecutor = Executors.newFixedThreadPool(this.debugServerConfig.getNumberOfThreadForClientRequestProcessing() > 1 ? this.debugServerConfig.getNumberOfThreadForClientRequestProcessing() : 1);
     }
 
     @Override
@@ -126,10 +135,10 @@ public class ClientHandler extends Thread implements AutoCloseable {
         HttpRequestInfo requestInfo = HttpRequestInfo.fromHttpRequest(httpRequest, true, false);
         MessageRequest messageRequest = MessageRequest.builder()
                 .command(MessageRequest.Command.CLIENT_EXECUTE_HTTP_REQUEST)
-                .data(OBJECT_MAPPER.writeValueAsBytes(requestInfo))
+                .dataBase64(DebugUtils.objectToBase64String(requestInfo))
                 .build();
-        byte[] responseData = this.sendMessageToClient(messageRequest, timeOutInMs);
-        return DebugUtils.byteToObject(responseData, HttpResponseInfo.class, true);
+        String responseData = this.sendMessageToClient(messageRequest, timeOutInMs);
+        return DebugUtils.base64StringToObject(responseData, HttpResponseInfo.class);
     }
 
     public HttpResponseInfo forwardHttpRequestToClient(HttpServletRequest httpRequest) throws Exception {
@@ -160,57 +169,62 @@ public class ClientHandler extends Thread implements AutoCloseable {
 
                 if (message == null) continue;
 
-                MessageRequest messageRequest = message.getRequest();
-                MessageResponse messageResponse = MessageResponse.builder()
-                        .status(HttpStatus.OK.value())
-                        .build();
+                CompletableFuture.runAsync(() -> {
+                    MessageRequest messageRequest = message.getRequest();
+                    MessageResponse messageResponse = MessageResponse.builder()
+                            .status(HttpStatus.OK.value())
+                            .build();
 
-                try {
-                    switch (messageRequest.getCommand()) {
-                        case SERVER_EXIT:
-                            this.stop = true;
-                            break;
-                        case SERVER_GET_ENV:
-                            messageResponse.setData(System.getenv());
-                            break;
-                        case SERVER_GET_PROP:
-                            messageResponse.setData(System.getProperties());
-                            break;
-                        case SERVER_ADD_FILTER_PATTERN:
-                            List<FilterRequestMatchPattern> matchPatterns = DebugUtils.byteToObject(messageRequest.getData(), new TypeReference<>() {
-                            }, true);
-                            matchPatterns.forEach(e -> e.init());
-                            this.debugFilterRequest.addPattern(matchPatterns);
-                            break;
-                        case SERVER_GET_ALL_FILTER_PATTERN:
-                            messageResponse.setData(this.debugFilterRequest.getMatchPatterns());
-                            break;
-                        case SERVER_CLEAR_ALL_FILTER_PATTERN:
-                            this.debugFilterRequest.getMatchPatterns().clear();
-                            break;
-                        case SERVER_EXECUTE_HTTP_REQUEST:
-                            HttpRequestInfo clientRequestInfo = DebugUtils.byteToObject(messageRequest.getData(), HttpRequestInfo.class, true);
-                            messageResponse.setData(this.executeClientHttpRequest(clientRequestInfo));
-                            break;
-                        case SERVER_DOWNLOAD_FILE:
-                            String filePath = DebugUtils.byteToObject(messageRequest.getData(), String.class, true);
-                            messageResponse = FileUtils.downloadFile(filePath);
-                            break;
-                        case HEART_BEAT:
-                            messageResponse.setStatus(HttpStatus.OK.value());
-                            break;
+                    try {
+                        switch (messageRequest.getCommand()) {
+                            case SERVER_EXIT:
+                                this.stop = true;
+                                break;
+                            case SERVER_GET_ENV:
+                                messageResponse.encodeDataBase64(System.getenv());
+                                break;
+                            case SERVER_GET_PROP:
+                                messageResponse.encodeDataBase64(System.getProperties());
+                                break;
+                            case SERVER_ADD_FILTER_PATTERN:
+                                List<FilterRequestMatchPattern> matchPatterns = DebugUtils.base64StringToObject(messageRequest.getDataBase64(), new TypeReference<List<FilterRequestMatchPattern>>() {
+                                });
+                                matchPatterns.forEach(e -> e.init());
+                                this.debugFilterRequest.addPattern(matchPatterns);
+                                break;
+                            case SERVER_GET_ALL_FILTER_PATTERN:
+                                messageResponse.encodeDataBase64(this.debugFilterRequest.getMatchPatterns());
+                                break;
+                            case SERVER_CLEAR_ALL_FILTER_PATTERN:
+                                this.debugFilterRequest.getMatchPatterns().clear();
+                                break;
+                            case SERVER_EXECUTE_HTTP_REQUEST:
+                                HttpRequestInfo clientRequestInfo = DebugUtils.base64StringToObject(messageRequest.getDataBase64(), HttpRequestInfo.class);
+                                messageResponse.encodeDataBase64(this.executeClientHttpRequest(clientRequestInfo));
+                                break;
+                            case SERVER_DOWNLOAD_FILE:
+                                String filePath = DebugUtils.base64StringToObject(messageRequest.getDataBase64(), String.class);
+                                messageResponse = FileUtils.downloadFile(filePath);
+                                break;
+                            case SERVER_SET_CLIENT_NAME:
+                                this.clientName = DebugUtils.base64StringToObject(messageRequest.getDataBase64(), String.class);
+                                break;
+                            case HEART_BEAT:
+                                messageResponse.setStatus(HttpStatus.OK.value());
+                                break;
 
+                        }
+                    } catch (Throwable e) {
+                        log.error(LOG_ERROR_PREFIX + e.getMessage(), e);
+                        messageResponse.setStatus(HttpStatus.INTERNAL_SERVER_ERROR.value());
                     }
-                } catch (Throwable e) {
-                    log.error(LOG_ERROR_PREFIX + e.getMessage(), e);
-                    messageResponse.setStatus(HttpStatus.INTERNAL_SERVER_ERROR.value());
-                }
-                ServerClientMessage serverClientMessage = ServerClientMessage.builder()
-                        .id(message.getId())
-                        .type(ServerClientMessage.Type.RESPONSE)
-                        .response(messageResponse)
-                        .build();
-                this.messageToClientQueue.add(serverClientMessage);
+                    ServerClientMessage serverClientMessage = ServerClientMessage.builder()
+                            .id(message.getId())
+                            .type(ServerClientMessage.Type.RESPONSE)
+                            .response(messageResponse)
+                            .build();
+                    this.messageToClientQueue.add(serverClientMessage);
+                }, this.processClientRequestExecutor);
             }
         }, this.executor);
     }
@@ -248,7 +262,7 @@ public class ClientHandler extends Thread implements AutoCloseable {
 
                 log.debug("DebugLib: Matching httpRequestJsonFormat [{}]", httpRequestJsonFormat);
 
-                return this.debugFilterRequest.isMatch(httpRequestJsonFormat);
+                return this.debugFilterRequest.isMatch(JsonPath.parse(httpRequestJsonFormat));
             } catch (Throwable e) {
                 log.error(LOG_ERROR_PREFIX + e.getMessage(), e);
             }
@@ -258,6 +272,10 @@ public class ClientHandler extends Thread implements AutoCloseable {
 
     public String getClientId() {
         return this.clientId;
+    }
+
+    public String getClientName() {
+        return this.clientName;
     }
 
     @Override
@@ -287,7 +305,20 @@ public class ClientHandler extends Thread implements AutoCloseable {
             } catch (Throwable e) {
                 log.error(LOG_ERROR_PREFIX + e.getMessage(), e);
             }
+
         });
+
+        try {
+            this.processClientRequestExecutor.shutdownNow();
+        } catch (Throwable e) {
+            log.error("DebugLib: Error happen when shutdown process client executor service" + e.getMessage(), e);
+        }
+
+        try {
+            this.processClientRequestExecutor.awaitTermination(1, TimeUnit.MINUTES);
+        } catch (Throwable e) {
+            log.error("DebugLib: Timeout when shutdown process client executor service" + e.getMessage(), e);
+        }
 
         this.serverRequestId.forEach((key, value) -> {
             try {
@@ -358,7 +389,7 @@ public class ClientHandler extends Thread implements AutoCloseable {
     }
 
     private HttpResponseInfo executeClientHttpRequest(HttpRequestInfo httpRequestInfo) {
-        HttpResponseInfo responseInfo = HttpUtils.executeHttpRequest(
+        HttpResponseInfo responseInfo = HttpUtils.executeHttpRequestByRest(
                 httpRequestInfo.getUri(),
                 null,
                 httpRequestInfo.getMethod(),
@@ -401,7 +432,7 @@ public class ClientHandler extends Thread implements AutoCloseable {
         }, this.executor);
     }
 
-    private byte[] sendMessageToClient(MessageRequest messageRequest, int timeOutInMs) throws Exception {
+    private String sendMessageToClient(MessageRequest messageRequest, int timeOutInMs) throws Exception {
         String messageId = "SERVER-" + UUID.randomUUID();
 
         this.serverRequestId.put(messageId, messageId);
@@ -446,7 +477,7 @@ public class ClientHandler extends Thread implements AutoCloseable {
                     throw new Exception("Unexpected error");
                 }
 
-                return message.getResponse().getData();
+                return message.getResponse().getDataBase64();
             }
         }
     }

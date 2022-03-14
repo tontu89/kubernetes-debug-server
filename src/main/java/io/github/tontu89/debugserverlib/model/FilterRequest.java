@@ -1,5 +1,6 @@
 package io.github.tontu89.debugserverlib.model;
 
+import com.jayway.jsonpath.DocumentContext;
 import lombok.Getter;
 import lombok.ToString;
 
@@ -26,7 +27,7 @@ public class FilterRequest implements Serializable {
         debugServerRequestMatchPattern.stream().forEach(e -> addPattern(e));
     }
 
-    public boolean isMatch(String httpRequestJsonFormat) {
+    public boolean isMatch(DocumentContext httpRequestJsonFormat) {
         for(FilterRequestMatchPattern matchPattern : this.matchPatterns) {
             if (matchPattern.isMatch(httpRequestJsonFormat)) {
                 return true;

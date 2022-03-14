@@ -1,16 +1,14 @@
 package io.github.tontu89.debugserverlib.model;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
+import io.github.tontu89.debugserverlib.utils.DebugUtils;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
-import lombok.SneakyThrows;
 import lombok.ToString;
 
+import java.io.IOException;
 import java.io.Serializable;
-
-import static io.github.tontu89.debugserverlib.utils.Constants.OBJECT_MAPPER;
 
 @Data
 @ToString
@@ -19,11 +17,11 @@ import static io.github.tontu89.debugserverlib.utils.Constants.OBJECT_MAPPER;
 @Builder
 public class MessageResponse implements Serializable {
     private int status;
-    private byte[] data;
+    private String dataBase64;
 
-    public void setData(Object o) throws JsonProcessingException {
+    public void encodeDataBase64(Object o) throws IOException {
         if (o != null) {
-            data = OBJECT_MAPPER.writeValueAsBytes(o);
+            dataBase64 = DebugUtils.objectToBase64String(o);
         }
     }
 }

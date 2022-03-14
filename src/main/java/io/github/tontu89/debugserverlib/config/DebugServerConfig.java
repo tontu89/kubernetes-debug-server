@@ -13,4 +13,5 @@ import org.springframework.context.annotation.PropertySource;
 @ToString
 public class DebugServerConfig {
     private int port;
+    private int numberOfThreadForClientRequestProcessing;
 }

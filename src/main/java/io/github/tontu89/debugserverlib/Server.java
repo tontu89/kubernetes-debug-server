@@ -2,12 +2,16 @@ package io.github.tontu89.debugserverlib;
 
 import io.github.tontu89.debugserverlib.config.DebugServerConfig;
 import io.github.tontu89.debugserverlib.filter.DebugServerSpringFilter;
+import io.github.tontu89.debugserverlib.utils.DebugUtils;
+import io.github.tontu89.debugserverlib.utils.HttpUtils;
 import io.github.tontu89.debugserverlib.utils.HttpsTrustManager;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.context.annotation.Profile;
 import org.springframework.core.env.Environment;
 import org.springframework.core.env.Profiles;
 import org.springframework.stereotype.Component;
+import org.springframework.web.client.RestTemplate;
 
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
@@ -17,6 +21,7 @@ import java.net.Socket;
 import java.util.Arrays;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.Executors;
 
 import static io.github.tontu89.debugserverlib.utils.Constants.LOG_ERROR_PREFIX;
 
@@ -36,7 +41,7 @@ public class Server implements AutoCloseable {
 
         if (this.isEnableRemoteDebug(env)) {
             log.info("DebugLib: Prepare to load debug server");
-            CompletableFuture.runAsync(() -> this.start());
+            CompletableFuture.runAsync(() -> this.start(), Executors.newSingleThreadExecutor());
         }
     }
 
@@ -69,7 +74,7 @@ public class Server implements AutoCloseable {
                     log.info("DebugLib: Assigning new thread for this client");
 
                     // create a new thread object
-                    ClientHandler t = new ClientHandler(dis, dos, socket);
+                    ClientHandler t = new ClientHandler(this.debugServerConfig, dis, dos, socket);
 
                     // Invoking the start() method
                     t.start();

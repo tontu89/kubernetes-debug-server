@@ -1,3 +1,4 @@
 debug-server:
   port: 7777
+  numberOfThreadForClientRequestProcessing: 10
 

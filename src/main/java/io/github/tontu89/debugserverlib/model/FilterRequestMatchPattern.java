@@ -1,7 +1,9 @@
 package io.github.tontu89.debugserverlib.model;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.jayway.jsonpath.DocumentContext;
 import com.jayway.jsonpath.JsonPath;
+import io.github.tontu89.debugserverlib.utils.Constants;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
@@ -26,10 +28,10 @@ public class FilterRequestMatchPattern implements Serializable {
     private String matchPattern;
 
     @JsonIgnore
-    private JsonPath jsonPathObject;
+    private transient JsonPath jsonPathObject;
 
     @JsonIgnore
-    private Pattern matchPatternObject;
+    private transient Pattern matchPatternObject;
 
     @Builder
     public FilterRequestMatchPattern(String jsonPath, String matchPattern) {
@@ -43,21 +45,20 @@ public class FilterRequestMatchPattern implements Serializable {
         this.matchPatternObject = Pattern.compile(this.matchPattern);
     }
 
-    @SneakyThrows
-    public boolean isMatch(String httpRequestJsonFormat) {
-        String data = this.getJsonPathData(httpRequestJsonFormat);
+    public boolean isMatch(DocumentContext httpRequestJsonFormat) {
         boolean matchResult = false;
-        if (data != null) {
-            Matcher matcher = this.matchPatternObject.matcher(data);
-            matchResult = matcher.matches();
+        try {
+            String data = httpRequestJsonFormat.read(this.jsonPathObject, String.class);
+            if (data != null) {
+                Matcher matcher = this.matchPatternObject.matcher(data);
+                matchResult = matcher.matches();
+            }
+
+            log.debug("DebugLib: URI data [{}] with matchPattern [{}] with result {}", data, matchPattern, matchResult);
+
+        } catch (Exception e) {
+            log.error(Constants.LOG_ERROR_PREFIX + e.getMessage(), e);
         }
-
-        log.debug("DebugLib: URI data [{}] with matchPattern [{}] with result {}", data, matchPattern, matchResult);
-
         return matchResult;
-    }
-
-    private String getJsonPathData(String json) {
-        return JsonPath.parse(json).read(this.jsonPathObject, String.class);
     }
 }

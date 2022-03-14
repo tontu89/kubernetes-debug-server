@@ -21,7 +21,7 @@ public class HttpResponseInfo implements Serializable {
     private Map<String, String> headers;
     private String payload;
 
-    public void resetContentLengthHeader() {
+    public void fixResponseHeader() {
         int contentLength = 0;
 
         if (this.payload != null) {
@@ -31,6 +31,12 @@ public class HttpResponseInfo implements Serializable {
         if (this.headers != null) {
             for (String key : this.headers.keySet()) {
                 if ("content-length".equals(key.toLowerCase(Locale.ROOT))) {
+                    this.headers.remove(key);
+                    break;
+                } else if ("transfer-encoding".equals(key.toLowerCase(Locale.ROOT))) {
+                    this.headers.remove(key);
+                    break;
+                } else if ("content-encoding".equals(key.toLowerCase(Locale.ROOT))) {
                     this.headers.remove(key);
                     break;
                 }
