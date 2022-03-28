@@ -63,7 +63,7 @@ public class DebugUtils {
 
         if (message.getRequest() != null && message.getRequest().getCommand() == MessageRequest.Command.HEART_BEAT) {
 
-        } else {
+        } else if (message.getRequest() != null || (message.getResponse() != null && !(message.getResponse().getStatus() == 200 && message.getResponse().getDataBase64() == null))) {
             log.debug("DebugLib: Send message for ID: {}, type: {}, command: {}", message.getId(), message.getType(), message.getRequest() == null ? null : message.getRequest().getCommand());
         }
     }
@@ -80,7 +80,8 @@ public class DebugUtils {
 
         ServerClientMessage message = Constants.OBJECT_MAPPER.readValue(data, ServerClientMessage.class);
 
-        if (message.getRequest() != null && message.getRequest().getCommand() == MessageRequest.Command.HEART_BEAT) {
+        if ((message.getRequest() != null && message.getRequest().getCommand() == MessageRequest.Command.HEART_BEAT) ||
+                (message.getResponse() != null && message.getResponse().getStatus() == Constants.HEART_BEAT_RESPONSE_CODE)) {
 
         } else {
             log.debug("DebugLib: Received message for ID: {}, type: {}, command: {}", message.getId(), message.getType(), message.getRequest() == null ? null : message.getRequest().getCommand());

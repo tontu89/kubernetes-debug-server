@@ -10,6 +10,7 @@ import java.io.Serializable;
 import java.nio.charset.StandardCharsets;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Optional;
 
 @Data
 @ToString
@@ -21,30 +22,14 @@ public class HttpResponseInfo implements Serializable {
     private Map<String, String> headers;
     private String payload;
 
-    public void fixResponseHeader() {
-        int contentLength = 0;
+    public static void removeEncodingHeader(Map<String, String> headers) {
+        Optional.ofNullable(headers).ifPresent(tmpHeaders -> tmpHeaders.entrySet()
+                .removeIf(header ->
+                        "transfer-encoding".equals(header.getKey().toLowerCase(Locale.ROOT)) ||
+                                "content-encoding".equals(header.getKey().toLowerCase(Locale.ROOT))));
+    }
 
-        if (this.payload != null) {
-            contentLength = this.payload.getBytes(StandardCharsets.UTF_8).length;
-        }
-
-        if (this.headers != null) {
-            for (String key : this.headers.keySet()) {
-                if ("content-length".equals(key.toLowerCase(Locale.ROOT))) {
-                    this.headers.remove(key);
-                    break;
-                } else if ("transfer-encoding".equals(key.toLowerCase(Locale.ROOT))) {
-                    this.headers.remove(key);
-                    break;
-                } else if ("content-encoding".equals(key.toLowerCase(Locale.ROOT))) {
-                    this.headers.remove(key);
-                    break;
-                }
-            }
-
-            if (contentLength > 0) {
-                this.headers.put("Content-Length", contentLength + "");
-            }
-        }
+    public void removeEncodingHeader() {
+        HttpResponseInfo.removeEncodingHeader(this.headers);
     }
 }

@@ -17,6 +17,7 @@ import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.util.Locale;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CopyOnWriteArrayList;
@@ -45,6 +46,9 @@ public class DebugServerSpringFilter implements Filter {
             CachedBodyHttpServletRequest cachedBodyHttpServletRequest = new CachedBodyHttpServletRequest(httpServletRequest);
             HttpServletResponse res = (HttpServletResponse) servletResponse;
 
+            // Remove transfer-encoding and content-encoding before further processing
+            HttpResponseInfo.removeEncodingHeader(cachedBodyHttpServletRequest.getHeaders());
+
             log.info("DebugLib: Check matching request for {}", uri);
 
             try {
@@ -55,18 +59,7 @@ public class DebugServerSpringFilter implements Filter {
                         log.info("DebugLib: URL {} matched. Will be forwarding to client [{}][{}]", cachedBodyHttpServletRequest.getRequestURI(), debugClientHandler.getClientName(), debugClientHandler.getClientId());
                         matched = true;
                         HttpResponseInfo clientResponse = debugClientHandler.forwardHttpRequestToClient(cachedBodyHttpServletRequest);
-
-                        Optional.ofNullable(clientResponse.getHeaders()).ifPresent(headers -> headers.forEach((headerName, headerValue) -> {
-                            // Content is plain text
-                            if (!"Content-Encoding".equalsIgnoreCase(headerName) && "gzip".equalsIgnoreCase(headerValue)) {
-                                // Do nothing
-                            } else if ("transfer-encoding".equalsIgnoreCase(headerName)) {
-                                // Do nothing;
-                            } else {
-                                res.addHeader(headerName, clientResponse.getHeaders().get(headerValue));
-                            }
-                        }));
-
+                        Optional.ofNullable(clientResponse.getHeaders()).ifPresent(headers -> headers.forEach((name, value) -> res.setHeader(name, value)));
                         res.setStatus(clientResponse.getHttpStatus());
                         byte[] responseData = clientResponse.getPayload().getBytes(StandardCharsets.UTF_8);
                         res.setContentLength(responseData.length);

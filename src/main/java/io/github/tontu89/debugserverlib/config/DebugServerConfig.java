@@ -13,5 +13,8 @@ import org.springframework.context.annotation.PropertySource;
 @ToString
 public class DebugServerConfig {
     private int port;
-    private int numberOfThreadForClientRequestProcessing;
+    private int numberOfThreadPerClient;
+    private int heartBeatIntervalMs;
+    private int heartBeatTimeoutMs;
+    private boolean enableHeartBeat;
 }

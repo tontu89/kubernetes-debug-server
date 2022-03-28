@@ -1,6 +1,7 @@
 package io.github.tontu89.debugserverlib.model;
 
 import com.auth0.jwt.exceptions.JWTDecodeException;
+import io.github.tontu89.debugserverlib.filter.requestwrapper.CachedBodyHttpServletRequest;
 import io.github.tontu89.debugserverlib.utils.HttpUtils;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -30,30 +31,9 @@ public class HttpRequestInfo implements Serializable {
     private String method;
     private Map<String, String> headers;
     private String payload;
-    private Map authorization;
 
-    public static HttpRequestInfo fromHttpRequest(HttpServletRequest request, boolean withPayload, boolean extractAuth) {
-        Map authorization = null;
-        Map<String, String> headers = new HashMap<>();
-        Enumeration<String> headerNames = request.getHeaderNames();
-        while(headerNames.hasMoreElements()) {
-            String headerName = headerNames.nextElement();
-            String headerValue = request.getHeader(headerName);
-            headers.put(headerName, headerValue);
-
-            if (extractAuth && "authorization".equalsIgnoreCase(headerName.toLowerCase(Locale.ROOT)) && !StringUtils.isBlank(headerValue)) {
-                try {
-                    if (headerValue.startsWith("Bearer")) {
-                        authorization = HttpUtils.decodeJwtPayload(headerValue.substring("Bearer ".length()));
-                    } else {
-                        authorization = HttpUtils.decodeJwtPayload(headerValue);
-                    }
-                } catch (JWTDecodeException e){
-                    log.error("DebugLib: failed to parse authorization jwt token [{}]", headerValue);
-                    log.error(LOG_ERROR_PREFIX + e.getMessage(), e);
-                }
-            }
-        }
+    public static HttpRequestInfo fromHttpRequest(CachedBodyHttpServletRequest request, boolean withPayload) {
+        Map<String, String> headers = request.getHeaders();
 
         String payload = null;
         if (withPayload) {
@@ -65,7 +45,6 @@ public class HttpRequestInfo implements Serializable {
                 .method(request.getMethod())
                 .headers(headers)
                 .payload(payload)
-                .authorization(authorization)
                 .build();
 
         return originalRequestInfo;

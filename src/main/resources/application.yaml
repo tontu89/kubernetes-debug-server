@@ -1,4 +1,7 @@
 debug-server:
   port: 7777
-  numberOfThreadForClientRequestProcessing: 10
+  numberOfThreadPerClient: 2
+  heartBeatIntervalMs: 2000
+  heartBeatTimeoutMs: 5000
+  enableHeartBeat: false
 

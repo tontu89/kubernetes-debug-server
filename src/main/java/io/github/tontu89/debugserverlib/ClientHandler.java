@@ -3,6 +3,7 @@ package io.github.tontu89.debugserverlib;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.jayway.jsonpath.JsonPath;
 import io.github.tontu89.debugserverlib.config.DebugServerConfig;
+import io.github.tontu89.debugserverlib.filter.requestwrapper.CachedBodyHttpServletRequest;
 import io.github.tontu89.debugserverlib.model.FilterRequest;
 import io.github.tontu89.debugserverlib.model.FilterRequestMatchPattern;
 import io.github.tontu89.debugserverlib.model.HttpRequestInfo;
@@ -10,6 +11,7 @@ import io.github.tontu89.debugserverlib.model.HttpResponseInfo;
 import io.github.tontu89.debugserverlib.model.MessageRequest;
 import io.github.tontu89.debugserverlib.model.MessageResponse;
 import io.github.tontu89.debugserverlib.model.ServerClientMessage;
+import io.github.tontu89.debugserverlib.utils.Constants;
 import io.github.tontu89.debugserverlib.utils.DebugUtils;
 import io.github.tontu89.debugserverlib.utils.FileUtils;
 import io.github.tontu89.debugserverlib.utils.HttpUtils;
@@ -17,14 +19,12 @@ import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 
-import javax.servlet.http.HttpServletRequest;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.EOFException;
 import java.io.IOException;
 import java.net.Socket;
 import java.net.SocketException;
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
@@ -88,7 +88,7 @@ public class ClientHandler extends Thread implements AutoCloseable {
         this.stop = false;
         this.clientId = UUID.randomUUID().toString();
         this.debugServerConfig = debugServerConfig;
-        this.processClientRequestExecutor = Executors.newFixedThreadPool(this.debugServerConfig.getNumberOfThreadForClientRequestProcessing() > 1 ? this.debugServerConfig.getNumberOfThreadForClientRequestProcessing() : 1);
+        this.processClientRequestExecutor = Executors.newFixedThreadPool(this.debugServerConfig.getNumberOfThreadPerClient() > 1 ? this.debugServerConfig.getNumberOfThreadPerClient() : 1);
     }
 
     @Override
@@ -100,7 +100,7 @@ public class ClientHandler extends Thread implements AutoCloseable {
             startSendMessageToClient();
             startProcessClientRequest();
             startProcessClientResponse();
-//            startSendHeartBeat();
+            startSendHeartBeat();
 
             while (!this.stop && !this.socket.isClosed()) {
                 try {
@@ -131,8 +131,8 @@ public class ClientHandler extends Thread implements AutoCloseable {
         this.close();
     }
 
-    public HttpResponseInfo forwardHttpRequestToClient(HttpServletRequest httpRequest, int timeOutInMs) throws Exception {
-        HttpRequestInfo requestInfo = HttpRequestInfo.fromHttpRequest(httpRequest, true, false);
+    public HttpResponseInfo forwardHttpRequestToClient(CachedBodyHttpServletRequest httpRequest, int timeOutInMs) throws Exception {
+        HttpRequestInfo requestInfo = HttpRequestInfo.fromHttpRequest(httpRequest, true);
         MessageRequest messageRequest = MessageRequest.builder()
                 .command(MessageRequest.Command.CLIENT_EXECUTE_HTTP_REQUEST)
                 .dataBase64(DebugUtils.objectToBase64String(requestInfo))
@@ -141,7 +141,7 @@ public class ClientHandler extends Thread implements AutoCloseable {
         return DebugUtils.base64StringToObject(responseData, HttpResponseInfo.class);
     }
 
-    public HttpResponseInfo forwardHttpRequestToClient(HttpServletRequest httpRequest) throws Exception {
+    public HttpResponseInfo forwardHttpRequestToClient(CachedBodyHttpServletRequest httpRequest) throws Exception {
         return this.forwardHttpRequestToClient(httpRequest, MAX_REQUEST_TIME_OUT_MS);
     }
 
@@ -210,7 +210,7 @@ public class ClientHandler extends Thread implements AutoCloseable {
                                 this.clientName = DebugUtils.base64StringToObject(messageRequest.getDataBase64(), String.class);
                                 break;
                             case HEART_BEAT:
-                                messageResponse.setStatus(HttpStatus.OK.value());
+                                messageResponse.setStatus(Constants.HEART_BEAT_RESPONSE_CODE);
                                 break;
 
                         }
@@ -255,10 +255,10 @@ public class ClientHandler extends Thread implements AutoCloseable {
         }, this.executor);
     }
 
-    public boolean isMatch(HttpServletRequest httpRequest) {
+    public boolean isMatch(CachedBodyHttpServletRequest httpRequest) {
         if (this.isRunning()) {
             try {
-                String httpRequestJsonFormat = OBJECT_MAPPER.writeValueAsString(HttpRequestInfo.fromHttpRequest(httpRequest, true, true));
+                String httpRequestJsonFormat = OBJECT_MAPPER.writeValueAsString(HttpRequestInfo.fromHttpRequest(httpRequest, true));
 
                 log.debug("DebugLib: Matching httpRequestJsonFormat [{}]", httpRequestJsonFormat);
 
@@ -405,31 +405,33 @@ public class ClientHandler extends Thread implements AutoCloseable {
     }
 
     private void startSendHeartBeat() {
-        this.heartBeatFuture = CompletableFuture.runAsync(() -> {
-            try {
-                log.info("DebugLib: Heart beat is running");
-                MessageRequest messageRequest = MessageRequest.builder()
-                        .command(MessageRequest.Command.HEART_BEAT)
-                        .build();
+        if (this.debugServerConfig.isEnableHeartBeat()) {
+            this.heartBeatFuture = CompletableFuture.runAsync(() -> {
+                try {
+                    log.info("DebugLib: Heart beat is running");
+                    MessageRequest messageRequest = MessageRequest.builder()
+                            .command(MessageRequest.Command.HEART_BEAT)
+                            .build();
 
-                while (!this.stop) {
-                    try {
-                        this.sendMessageToClient(messageRequest, 5000);
-                        Thread.sleep(500);
-                    } catch (Throwable e) {
-                        log.error(LOG_ERROR_PREFIX + " HeartBeat check exception: " + e.getMessage(), e);
-                        break;
+                    while (!this.stop) {
+                        try {
+                            this.sendMessageToClient(messageRequest, this.debugServerConfig.getHeartBeatTimeoutMs());
+                            Thread.sleep(this.debugServerConfig.getHeartBeatIntervalMs());
+                        } catch (Throwable e) {
+                            log.error(LOG_ERROR_PREFIX + " HeartBeat check exception: " + e.getMessage(), e);
+                            break;
+                        }
                     }
+                    log.info("DebugLib: Heart beat is stopped");
+                } catch (Throwable e) {
+                    log.error(LOG_ERROR_PREFIX + e.getMessage(), e);
                 }
-                log.info("DebugLib: Heart beat is stopped");
-            } catch (Throwable e) {
-                log.error(LOG_ERROR_PREFIX + e.getMessage(), e);
-            }
 
-            this.closeAsync();
+                this.closeAsync();
 
 
-        }, this.executor);
+            }, this.executor);
+        }
     }
 
     private String sendMessageToClient(MessageRequest messageRequest, int timeOutInMs) throws Exception {

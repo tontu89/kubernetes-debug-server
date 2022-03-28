@@ -15,17 +15,15 @@ import okhttp3.Response;
 import okhttp3.logging.HttpLoggingInterceptor;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.boot.web.client.RestTemplateBuilder;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
-import org.springframework.http.client.ClientHttpRequestFactory;
 import org.springframework.http.client.HttpComponentsClientHttpRequestFactory;
+import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.RequestCallback;
 import org.springframework.web.client.ResponseExtractor;
 import org.apache.http.conn.ssl.NoopHostnameVerifier;
-import org.apache.http.conn.ssl.SSLConnectionSocketFactory;
-import org.apache.http.conn.ssl.TrustStrategy;
 import org.apache.http.impl.client.CloseableHttpClient;
 import org.apache.http.impl.client.HttpClients;
-import org.springframework.http.client.HttpComponentsClientHttpRequestFactory;
 import org.springframework.web.client.RestTemplate;
 
 
@@ -48,7 +46,8 @@ import java.security.cert.X509Certificate;
 import java.util.Base64;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.function.Supplier;
+import java.util.Optional;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.regex.Pattern;
 import java.util.zip.GZIPInputStream;
 
@@ -102,19 +101,25 @@ public class HttpUtils {
             uri = StringUtils.isBlank(uri) ? "" : (uri.startsWith("/") ? uri : ("/" + uri));
             URL url = new URL(host + uri);
 
-
             RestTemplate restTemplate = prepareRestTemplate(new RestTemplateBuilder());
 
             responseInfo = restTemplate.execute(url.toString(), HttpMethod.resolve(httpMethod), (RequestCallback) request -> {
+                AtomicBoolean needToResetContentLength = new AtomicBoolean(false);
+
                 headers.forEach((k, v) -> {
                     if (!"content-length".equalsIgnoreCase(k)) {
                         request.getHeaders().add(k, v);
+                    } else {
+                        needToResetContentLength.set(true);
                     }
                 });
 
                 if (payload != null && payload.length() > 0) {
                     byte[] data = payload.getBytes(StandardCharsets.UTF_8);
-                    request.getHeaders().add("content-length", data.length + "");
+
+                    if (needToResetContentLength.get()) {
+                        request.getHeaders().add("content-length", data.length + "");
+                    }
 
                     OutputStream outputStream = request.getBody();
                     outputStream.write(payload.getBytes(StandardCharsets.UTF_8));
@@ -128,19 +133,25 @@ public class HttpUtils {
                         returnedPayload = new String(data);
                     }
                 }
-                return HttpResponseInfo.builder()
+                HttpResponseInfo restResponse = HttpResponseInfo.builder()
                         .httpStatus(response.getRawStatusCode())
-                        .headers(response.getHeaders().toSingleValueMap())
+                        .headers(fromHttpHeadersToMap(response.getHeaders()))
                         .payload(returnedPayload)
                         .build();
+                restResponse.removeEncodingHeader();
+                return restResponse;
             });
+        } catch (HttpClientErrorException e) {
+            responseInfo = HttpResponseInfo.builder()
+                    .httpStatus(e.getRawStatusCode())
+                    .payload(e.getResponseBodyAsString())
+                    .build();
         } catch (Throwable e) {
             log.info(Constants.LOG_ERROR_PREFIX + e.getMessage(), e);
-        }
 
-        if (responseInfo == null) {
             responseInfo = HttpResponseInfo.builder()
                     .httpStatus(500)
+                    .payload(e.getMessage())
                     .build();
         }
 
@@ -270,14 +281,16 @@ public class HttpUtils {
         /*
          * Ignore untrusted certificates
          */
-        TrustManager[] trustAllCerts = new TrustManager[] {
+        TrustManager[] trustAllCerts = new TrustManager[]{
                 new X509TrustManager() {
                     public java.security.cert.X509Certificate[] getAcceptedIssuers() {
                         return new X509Certificate[0];
                     }
+
                     public void checkClientTrusted(
                             java.security.cert.X509Certificate[] certs, String authType) {
                     }
+
                     public void checkServerTrusted(
                             java.security.cert.X509Certificate[] certs, String authType) {
                     }
@@ -308,5 +321,16 @@ public class HttpUtils {
          */
         return builder.requestFactory(() -> customRequestFactory).build();
 
+    }
+
+    private static Map<String, String> fromHttpHeadersToMap(HttpHeaders headers) {
+        Map<String, String> result = new HashMap<>();
+        Optional.ofNullable(headers).ifPresent(httpHeaders -> httpHeaders.forEach((key, values) -> {
+            if (values != null && !values.isEmpty()) {
+                result.put(key, values.get(values.size() - 1));
+            }
+        }));
+
+        return result;
     }
 }
