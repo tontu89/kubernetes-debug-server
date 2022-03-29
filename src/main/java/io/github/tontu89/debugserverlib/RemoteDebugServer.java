@@ -1,17 +1,12 @@
 package io.github.tontu89.debugserverlib;
 
-import io.github.tontu89.debugserverlib.config.DebugServerConfig;
+import io.github.tontu89.debugserverlib.config.RemoteDebugServerConfig;
 import io.github.tontu89.debugserverlib.filter.DebugServerSpringFilter;
-import io.github.tontu89.debugserverlib.utils.DebugUtils;
-import io.github.tontu89.debugserverlib.utils.HttpUtils;
 import io.github.tontu89.debugserverlib.utils.HttpsTrustManager;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.context.annotation.Profile;
 import org.springframework.core.env.Environment;
-import org.springframework.core.env.Profiles;
 import org.springframework.stereotype.Component;
-import org.springframework.web.client.RestTemplate;
 
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
@@ -24,20 +19,21 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executors;
 
 import static io.github.tontu89.debugserverlib.utils.Constants.LOG_ERROR_PREFIX;
+import static io.github.tontu89.debugserverlib.utils.Constants.SPRING_PROFILE_NAME;
 
-@Profile("RemoteDebug")
+@Profile(SPRING_PROFILE_NAME)
 @Component
 @Slf4j
-public class Server implements AutoCloseable {
+public class RemoteDebugServer implements AutoCloseable {
     private boolean stop;
 
-    private DebugServerConfig debugServerConfig;
+    private RemoteDebugServerConfig remoteDebugServerConfig;
     private DebugServerSpringFilter debugServerSpringFilter;
     private ServerSocket server = null;
 
-    public Server(DebugServerSpringFilter debugServerSpringFilter, DebugServerConfig debugServerConfig, Environment env) {
+    public RemoteDebugServer(DebugServerSpringFilter debugServerSpringFilter, RemoteDebugServerConfig remoteDebugServerConfig, Environment env) {
         this.debugServerSpringFilter = debugServerSpringFilter;
-        this.debugServerConfig = debugServerConfig;
+        this.remoteDebugServerConfig = remoteDebugServerConfig;
 
         if (this.isEnableRemoteDebug(env)) {
             log.info("DebugLib: Prepare to load debug server");
@@ -52,7 +48,7 @@ public class Server implements AutoCloseable {
             Socket socket = null;
 
             // Try to start on default port
-            if (!this.startServer(this.debugServerConfig.getPort())) {
+            if (!this.startServer(this.remoteDebugServerConfig.getPort())) {
 
                 // Try to start on random port
                 this.startServer(null);
@@ -74,7 +70,7 @@ public class Server implements AutoCloseable {
                     log.info("DebugLib: Assigning new thread for this client");
 
                     // create a new thread object
-                    ClientHandler t = new ClientHandler(this.debugServerConfig, dis, dos, socket);
+                    ClientHandler t = new ClientHandler(this.remoteDebugServerConfig, dis, dos, socket);
 
                     // Invoking the start() method
                     t.start();
@@ -133,7 +129,7 @@ public class Server implements AutoCloseable {
     private boolean isEnableRemoteDebug(Environment env) {
         if (env != null) {
             String[] activeProfiles = env.getActiveProfiles();
-            return Optional.ofNullable(activeProfiles).map(a -> Arrays.stream(a).filter(p -> "RemoteDebug".equalsIgnoreCase(p)).count()).orElse(0L) > 0;
+            return Optional.ofNullable(activeProfiles).map(a -> Arrays.stream(a).filter(p -> SPRING_PROFILE_NAME.equalsIgnoreCase(p)).count()).orElse(0L) > 0;
         } else {
             log.info("DebugLib: Environment null pointer");
             return false;

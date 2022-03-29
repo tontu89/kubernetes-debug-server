@@ -2,7 +2,7 @@ package io.github.tontu89.debugserverlib;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.jayway.jsonpath.JsonPath;
-import io.github.tontu89.debugserverlib.config.DebugServerConfig;
+import io.github.tontu89.debugserverlib.config.RemoteDebugServerConfig;
 import io.github.tontu89.debugserverlib.filter.requestwrapper.CachedBodyHttpServletRequest;
 import io.github.tontu89.debugserverlib.model.FilterRequest;
 import io.github.tontu89.debugserverlib.model.FilterRequestMatchPattern;
@@ -54,7 +54,7 @@ public class ClientHandler extends Thread implements AutoCloseable {
     private final BlockingQueue<ServerClientMessage> messageToClientQueue;
     private final DataInputStream dis;
     private final DataOutputStream dos;
-    private final DebugServerConfig debugServerConfig;
+    private final RemoteDebugServerConfig remoteDebugServerConfig;
     private final Executor executor;
     private final ExecutorService processClientRequestExecutor;
     private final FilterRequest debugFilterRequest;
@@ -73,7 +73,7 @@ public class ClientHandler extends Thread implements AutoCloseable {
     private String clientName;
 
 
-    public ClientHandler(DebugServerConfig debugServerConfig, DataInputStream dis, DataOutputStream dos, Socket socket) {
+    public ClientHandler(RemoteDebugServerConfig remoteDebugServerConfig, DataInputStream dis, DataOutputStream dos, Socket socket) {
         this.socket = socket;
         this.dis = dis;
         this.dos = dos;
@@ -87,8 +87,8 @@ public class ClientHandler extends Thread implements AutoCloseable {
         this.serverRequestId = new ConcurrentHashMap<>();
         this.stop = false;
         this.clientId = UUID.randomUUID().toString();
-        this.debugServerConfig = debugServerConfig;
-        this.processClientRequestExecutor = Executors.newFixedThreadPool(this.debugServerConfig.getNumberOfThreadPerClient() > 1 ? this.debugServerConfig.getNumberOfThreadPerClient() : 1);
+        this.remoteDebugServerConfig = remoteDebugServerConfig;
+        this.processClientRequestExecutor = Executors.newFixedThreadPool(this.remoteDebugServerConfig.getNumberOfThreadPerClient() > 1 ? this.remoteDebugServerConfig.getNumberOfThreadPerClient() : 1);
     }
 
     @Override
@@ -405,7 +405,7 @@ public class ClientHandler extends Thread implements AutoCloseable {
     }
 
     private void startSendHeartBeat() {
-        if (this.debugServerConfig.isEnableHeartBeat()) {
+        if (this.remoteDebugServerConfig.isEnableHeartBeat()) {
             this.heartBeatFuture = CompletableFuture.runAsync(() -> {
                 try {
                     log.info("DebugLib: Heart beat is running");
@@ -415,8 +415,8 @@ public class ClientHandler extends Thread implements AutoCloseable {
 
                     while (!this.stop) {
                         try {
-                            this.sendMessageToClient(messageRequest, this.debugServerConfig.getHeartBeatTimeoutMs());
-                            Thread.sleep(this.debugServerConfig.getHeartBeatIntervalMs());
+                            this.sendMessageToClient(messageRequest, this.remoteDebugServerConfig.getHeartBeatTimeoutMs());
+                            Thread.sleep(this.remoteDebugServerConfig.getHeartBeatIntervalMs());
                         } catch (Throwable e) {
                             log.error(LOG_ERROR_PREFIX + " HeartBeat check exception: " + e.getMessage(), e);
                             break;

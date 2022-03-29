@@ -25,9 +25,10 @@ import java.util.concurrent.Executor;
 import java.util.concurrent.Executors;
 
 import static io.github.tontu89.debugserverlib.utils.Constants.LOG_ERROR_PREFIX;
+import static io.github.tontu89.debugserverlib.utils.Constants.SPRING_PROFILE_NAME;
 
 
-@Profile("RemoteDebug")
+@Profile(SPRING_PROFILE_NAME)
 @Component
 @Slf4j
 public class DebugServerSpringFilter implements Filter {

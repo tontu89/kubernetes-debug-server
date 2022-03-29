@@ -11,7 +11,7 @@ import org.springframework.context.annotation.PropertySource;
 @PropertySource(value = "classpath:application.yaml", factory = YamlPropertySourceFactory.class)
 @Data
 @ToString
-public class DebugServerConfig {
+public class RemoteDebugServerConfig {
     private int port;
     private int numberOfThreadPerClient;
     private int heartBeatIntervalMs;

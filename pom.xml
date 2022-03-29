@@ -11,7 +11,7 @@
 
     <groupId>io.github.tontu89</groupId>
     <artifactId>debug-server-lib</artifactId>
-    <version>0.0.28</version>
+    <version>0.0.31</version>
 
     <name>debug-server-lib</name>
     <description>debug-server-lib</description>
@@ -63,7 +63,7 @@
         <dependency>
             <groupId>com.fasterxml.jackson.core</groupId>
             <artifactId>jackson-databind</artifactId>
-            <version>2.13.0</version>
+            <version>2.13.2.1</version>
         </dependency>
 
         <!-- https://mvnrepository.com/artifact/javax.servlet/servlet-api -->

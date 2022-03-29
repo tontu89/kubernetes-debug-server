@@ -1,0 +1,2 @@
+org.springframework.boot.autoconfigure.EnableAutoConfiguration=\
+io.github.tontu89.debugserverlib.config.EnableRemoteDebugServerConfig

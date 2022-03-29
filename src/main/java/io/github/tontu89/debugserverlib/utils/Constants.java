@@ -9,4 +9,5 @@ public class Constants {
     public static final int MAX_REQUEST_TIME_OUT_MS = 10 * 60 * 1000;
     public static final int HEART_BEAT_RESPONSE_CODE = 222;
     public static final String LOG_ERROR_PREFIX = "DebugLib: exception ";
+    public static final String SPRING_PROFILE_NAME = "RemoteDebug";
 }
