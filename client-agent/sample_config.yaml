@@ -1,0 +1,95 @@
+---
+profiles:
+  any-profile-name:                                                                                                              # Any name. Ex: lending-service, ...
+    client-name: "my-pc"                                                                                                        # Any name
+    filters:
+    - json-path: "$.headers.some-key-name"                                                                                      # All requests that have "some-key-name" key in header and value is equal to
+      match-pattern: "some-key-value"                                                                                           # "some-key-value" will be forwarded to your local machine. It's also support to match $.uri, $.body
+    local:                                                                                                                      # Local setting
+      proxy-port: 8888                                                                                                          # When running, the library will start a proxy server in your local machine. So the port here is any available port in your local machine
+      web-url: "http://localhost:8080"                                                                                          # When running the service in local machine(ex: lending-service, payment-service....), spring boot will start an embedded web server. The URL is to access spring boot application in your local machine
+      environments:                                                                                                             # All setting in "local.environments" will override the setting from server in "server.environments" tag
+        HOME: null                                                                                                              # Null value mean: use the current local system value that set by local OS or local JAVA
+        JAVA_VERSION: null
+        PATH: null
+        SPRING_ACTIVEMQ_BROKER_URL: ""                                                                                          # Override local environment value by setting the value other than "null"
+        JAVA_TOOL_OPTIONS: null
+      system-properties:                                    # All setting in "local.system-properties" will override the setting from server in "server.system-properties" tag
+        kubernetes.disable.hostname.verification: true
+        kubernetes.trust.certificates: true
+        logging.level.com.debug.client: "DEBUG"
+        PID: null
+        awt.toolkit: null
+        java.awt.graphicsenv: null
+        java.awt.headless: null
+        java.awt.printerjob: null
+        java.class.path: null
+        java.class.version: null
+        java.home: null
+        java.io.tmpdir: null
+        java.library.path: null
+        java.runtime.name: null
+        java.runtime.version: null
+        java.specification.name: null
+        java.specification.vendor: null
+        java.specification.version: null
+        java.vendor: null
+        java.vendor.url: null
+        java.vendor.url.bug: null
+        java.version: null
+        java.version.date: null
+        java.vm.compressedOopsMode: null
+        java.vm.info: null
+        java.vm.name: null
+        java.vm.specification.name: null
+        java.vm.specification.vendor: null
+        java.vm.specification.version: null
+        java.vm.vendor: null
+        java.vm.version: null
+        jdk.debug: null
+        jetty.base: null
+        jetty.build: null
+        jetty.git.hash: null
+        jetty.home: null
+        jetty.tag.version: null
+        jetty.version: null
+        os.arch: null
+        os.name: null
+        os.version: null
+        path.separator: null
+        spring.beaninfo.ignore: null
+        sun.arch.data.model: null
+        sun.boot.library.path: null
+        sun.cpu.endian: null
+        sun.cpu.isalist: null
+        sun.io.unicode.encoding: null
+        sun.java.command: null
+        sun.java.launcher: null
+        sun.jnu.encoding: null
+        sun.management.compiler: null
+        sun.os.patch.level: null
+        user.dir: null
+        user.home: null
+        user.language: null
+        user.name: null
+        user.timezone: null
+    servers:
+      pod1:                                                                                                                     # Any name
+        address: "localhost:7777"
+        files-mapping:
+          /var/run/secrets/kubernetes.io/serviceaccount/ca.crt: "/var/run/secrets/kubernetes.io/serviceaccount/ca.crt"          # Format: server_file_path: local_file_path
+          /var/run/secrets/kubernetes.io/serviceaccount/token: "/var/run/secrets/kubernetes.io/serviceaccount/token"            # Download the file from server to local path
+          /var/run/secrets/kubernetes.io/serviceaccount/namespace: "/var/run/secrets/kubernetes.io/serviceaccount/namespace"
+        environments:                                                                                                           # Auto-generated by plugin. Don't modify anything in here. Everytime, running Intellij, those attributes will be overwritten
+          server.error.include-message: "always"
+          server.port: "8080"
+          spring.datasource.hikari.maximum-pool-size: "10"
+          spring.jackson.date-format: "yyyy-MM-dd'T'HH:mm:ss.SSS'Z'"
+          spring.jackson.time-zone: "UTC"
+          spring.lifecycle.timeout-per-shutdown-phase: "50s"
+          spring.profiles.active: "RemoteDebug"
+        system-properties:                                                                                                      # Auto-generated by plugin. Don't modify anything in here. Everytime, running Intellij, those attributes will be overwritten
+          LOG_LEVEL_PATTERN: "%5p [%cn,%X{X-B3-TraceId:-},%X{X-B3-SpanId:-},%X{X-Span-Export:-}]"
+          user.language: "en"
+          user.name: "nonroot"
+          user.timezone: "GMT"
