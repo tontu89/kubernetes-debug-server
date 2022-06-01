@@ -1,20 +1,25 @@
 ---
 profiles:
-  any-profile-name:                                                                                                              # Any name. Ex: lending-service, ...
-    client-name: "my-pc"                                                                                                        # Any name
+  any-profile-name:                                                                                                               # Any name. Ex: lending-service, ...
+    client-name: "my-pc"                                                                                                          # Any name
     filters:
-    - json-path: "$.headers.some-key-name"                                                                                      # All requests that have "some-key-name" key in header and value is equal to
-      match-pattern: "some-key-value"                                                                                           # "some-key-value" will be forwarded to your local machine. It's also support to match $.uri, $.body
-    local:                                                                                                                      # Local setting
-      proxy-port: 8888                                                                                                          # When running, the library will start a proxy server in your local machine. So the port here is any available port in your local machine
-      web-url: "http://localhost:8080"                                                                                          # When running the service in local machine(ex: lending-service, payment-service....), spring boot will start an embedded web server. The URL is to access spring boot application in your local machine
-      environments:                                                                                                             # All setting in "local.environments" will override the setting from server in "server.environments" tag
-        HOME: null                                                                                                              # Null value mean: use the current local system value that set by local OS or local JAVA
+      - json-path: "$.headers.some-key-name"                                                                                      # All requests that have "some-key-name" key in header and value is equal to
+        match-pattern: "some-key-value"                                                                                           # "some-key-value" will be forwarded to your local machine. It's also support to match $.uri, $.body
+    local:                                                                                                                        # Local setting
+      proxy-port: 8888                                                                                                            # When running, the library will start a proxy server in your local machine. So the port here is any available port in your local machine
+      web-url: "http://localhost:8080"                                                                                            # When running the service in local machine(ex: lending-service, payment-service....), spring boot will start an embedded web server. The URL is to access spring boot application in your local machine
+      mock-server:
+        enable: false
+        filters:
+          - json-path: "$.headers.some-key-name"                                                                                  # All requests that have "some-key-name" key in header and value is equal to
+            match-pattern: "some-key-value"
+      environments:                                                                                                               # All setting in "local.environments" will override the setting from server in "server.environments" tag
+        HOME: null                                                                                                                # Null value mean: use the current local system value that set by local OS or local JAVA
         JAVA_VERSION: null
         PATH: null
-        SPRING_ACTIVEMQ_BROKER_URL: ""                                                                                          # Override local environment value by setting the value other than "null"
+        SPRING_ACTIVEMQ_BROKER_URL: ""                                                                                            # Override local environment value by setting the value other than "null"
         JAVA_TOOL_OPTIONS: null
-      system-properties:                                    # All setting in "local.system-properties" will override the setting from server in "server.system-properties" tag
+      system-properties:                                                                                                          # All setting in "local.system-properties" will override the setting from server in "server.system-properties" tag
         kubernetes.disable.hostname.verification: true
         kubernetes.trust.certificates: true
         logging.level.com.debug.client: "DEBUG"

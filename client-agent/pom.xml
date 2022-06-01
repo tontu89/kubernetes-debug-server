@@ -102,6 +102,12 @@
         </dependency>
 
         <dependency>
+            <groupId>org.mock-server</groupId>
+            <artifactId>mockserver-netty-no-dependencies</artifactId>
+            <version>5.13.2</version>
+        </dependency>
+
+        <dependency>
             <groupId>io.github.tontu89</groupId>
             <artifactId>debug-server-lib</artifactId>
             <version>${project.version}</version>
