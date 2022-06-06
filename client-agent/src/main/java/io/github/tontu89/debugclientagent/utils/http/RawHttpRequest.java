@@ -128,8 +128,12 @@ public class RawHttpRequest {
      * Append body line to the rest of message body
      * @param bodyLine
      */
-    public void appendMessageBody(String bodyLine) {
-        body.append(bodyLine).append("\r\n");
+    public void appendMessageBody(String bodyLine, boolean appendNewLine) {
+		if (appendNewLine) {
+			body.append(bodyLine).append("\r\n");
+		} else {
+			body.append(bodyLine);
+		}
     }
     
     /**

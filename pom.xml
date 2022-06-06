@@ -4,7 +4,7 @@
 
     <groupId>io.github.tontu89</groupId>
     <artifactId>kubernetes-debug-extension</artifactId>
-    <version>0.0.32</version>
+    <version>0.0.34</version>
 
     <packaging>pom</packaging>
     <name>Kubernetes Debug Extension</name>

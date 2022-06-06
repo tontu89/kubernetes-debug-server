@@ -7,6 +7,7 @@ import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InvalidObjectException;
 import java.util.Locale;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 
 /**
@@ -86,12 +87,16 @@ public class HttpRequestParser {
 	private static void setBody(RawHttpRequest rawHttpRequest, BufferedReader reader) throws IOException {
 		char[] bodyChunk = new char[BUFFER_SIZE];
 		int read;
-		AtomicInteger contentLength = new AtomicInteger(-1);
 		int timeOutMs = 60 * 1000;
+
+		AtomicBoolean appendNewLineOnMessageBody = new AtomicBoolean(true);
+		AtomicInteger contentLength = new AtomicInteger(-1);
 
 		rawHttpRequest.getHeaders().forEach((key, value) -> {
 			if ("content-length".equals(key.toLowerCase(Locale.ROOT))) {
 				contentLength.set(Integer.parseInt(value));
+			} else if ("content-type".equals(key.toLowerCase(Locale.ROOT)) && "application/json".equals(value.toLowerCase(Locale.ROOT))) {
+				appendNewLineOnMessageBody.set(false);
 			}
 		});
 
@@ -99,7 +104,7 @@ public class HttpRequestParser {
 
 		do {
 			while (reader.ready() && (read = reader.read(bodyChunk, 0, BUFFER_SIZE)) != -1) {
-				rawHttpRequest.appendMessageBody(new String(bodyChunk, 0, read));
+				rawHttpRequest.appendMessageBody(new String(bodyChunk, 0, read), appendNewLineOnMessageBody.get());
 			}
 		} while (contentLength.get() != -1 && rawHttpRequest.getBody().length() < contentLength.get() && System.currentTimeMillis() < reachTimeOutMs);
 

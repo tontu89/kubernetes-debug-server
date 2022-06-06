@@ -6,6 +6,11 @@ import io.github.tontu89.debugclientagent.proxy.ProxyServer;
 import io.github.tontu89.debugclientagent.utils.AppConfigHelper;
 import io.github.tontu89.debugclientagent.utils.DebugServerHelper;
 import io.github.tontu89.debugclientagent.utils.SecurityUtils;
+import javassist.CannotCompileException;
+import javassist.ClassPool;
+import javassist.CtClass;
+import javassist.CtMethod;
+import javassist.NotFoundException;
 import lombok.extern.slf4j.Slf4j;
 
 import java.lang.instrument.Instrumentation;

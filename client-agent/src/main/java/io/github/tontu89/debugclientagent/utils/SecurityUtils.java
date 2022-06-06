@@ -1,6 +1,13 @@
 package io.github.tontu89.debugclientagent.utils;
 
+import io.github.tontu89.debugclientagent.config.AppConfig;
 import io.github.tontu89.debugclientagent.config.SSLConfig;
+import javassist.CannotCompileException;
+import javassist.ClassPool;
+import javassist.CtClass;
+import javassist.CtMethod;
+import javassist.NotFoundException;
+import lombok.extern.slf4j.Slf4j;
 import org.bouncycastle.asn1.ASN1Encodable;
 import org.bouncycastle.asn1.DERSequence;
 import org.bouncycastle.asn1.x500.X500NameBuilder;
@@ -57,6 +64,7 @@ import java.util.stream.Collectors;
 
 import static io.github.tontu89.debugserverlib.utils.Constants.SPRING_PROFILE_NAME;
 
+@Slf4j
 public class SecurityUtils {
 	private static Pattern ipPattern = Pattern.compile("^(([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\\.){3}([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])$");
 	/**
@@ -268,6 +276,7 @@ public class SecurityUtils {
 		System.setProperty("https.proxyPort", port);
 		System.setProperty("https.proxy", "https://localhost:" + port); // Spring kubernetes
 		System.setProperty("http.proxy", "http://localhost:" + port); // Spring kubernetes
+		modifyApacheHttpClientBuilderToAlwaysSupportProxy();
 	}
 
 	public static void setEnvironments(Map<String, String> newEnvironments) throws ClassNotFoundException, NoSuchFieldException, IllegalAccessException {
@@ -297,5 +306,22 @@ public class SecurityUtils {
 			value = Arrays.stream(profiles).dropWhile(p -> SPRING_PROFILE_NAME.equals(p)).collect(Collectors.joining());
 		}
 		return value;
+	}
+
+	private static void modifyApacheHttpClientBuilderToAlwaysSupportProxy() {
+		ClassPool classPool = ClassPool.getDefault();
+
+		try {
+			CtClass ctClass = classPool.get("org.apache.http.impl.client.HttpClientBuilder");
+
+			CtMethod ctMethod = ctClass.getDeclaredMethod("build");
+			ctMethod.insertBefore("systemProperties = true;");
+
+			ctClass.toClass();
+		} catch (NotFoundException e) {
+			log.warn("Cannot find class org.apache.http.impl.client.HttpClientBuilder");
+		} catch (CannotCompileException e) {
+			log.warn("Cannot find modify org.apache.http.impl.client.HttpClientBuilder.build");
+		}
 	}
 }

@@ -6,7 +6,7 @@
 
     <groupId>io.github.tontu89</groupId>
     <artifactId>debug-client-agent</artifactId>
-    <version>0.0.32</version>
+    <version>0.0.34</version>
 
     <dependencies>
         <dependency>
@@ -106,6 +106,14 @@
             <artifactId>debug-server-lib</artifactId>
             <version>${project.version}</version>
         </dependency>
+
+        <!-- https://mvnrepository.com/artifact/org.javassist/javassist -->
+        <dependency>
+            <groupId>org.javassist</groupId>
+            <artifactId>javassist</artifactId>
+            <version>3.29.0-GA</version>
+        </dependency>
+
     </dependencies>
     <properties>
         <maven.compiler.source>11</maven.compiler.source>
