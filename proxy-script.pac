@@ -3,6 +3,8 @@ function FindProxyForURL(url, host) {
         return "PROXY localhost:8898";
     } else if (shExpMatch(host, "*fi*.dev")) {
         return "PROXY 192.168.4.205:8887";
+    } else if (shExpMatch(host, "*bid*.com.*")) {
+        return "PROXY 192.168.4.205:8887";
     } else {
       return "DIRECT";
     }
