@@ -1,6 +1,6 @@
 function FindProxyForURL(url, host) {
     // Exclude specific URL from proxy
-    if (url === "https://bone.bidv.com.vn") {
+    if (shExpMatch(host, "bone.*bid*.com.*")) {
         return "DIRECT";
     }
 
