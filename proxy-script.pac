@@ -1,6 +1,6 @@
 function FindProxyForURL(url, host) {
     // Exclude specific URL from proxy
-    if (url === "https://bone.bidv.com.vn/dashboard") {
+    if (url === "https://bone.bidv.com.vn") {
         return "DIRECT";
     }
 
