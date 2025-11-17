@@ -1,8 +1,8 @@
 function FindProxyForURL(url, host) {
     // Exclude specific URL from proxy
     if (shExpMatch(host, "bone.*bid*.com.*")) {
-         return "PROXY 192.168.4.205:8887";
-        //return "DIRECT";
+         //return "PROXY 192.168.4.205:8887";
+        return "DIRECT";
     }
 
     if (shExpMatch(host, "*kasi*.com")) {
@@ -15,4 +15,5 @@ function FindProxyForURL(url, host) {
         return "DIRECT";
     }
 }
+
 
